@@ -2,6 +2,7 @@
 CAPSTONE Project for BOM Squad
 
 
+
 { ----- GETTING STARTED ----- ]
 For setting up your local repository and envrionment for the first time, follow the instructions below:
 1. clone the repository into your local project folder: "git clone https://github.com/marlonlewis2020/bom-squad.git"
@@ -21,6 +22,8 @@ For setting up your local repository and envrionment for the first time, follow 
 6. Set upstream remote branch: "git push -u origin develop"
 
 
+
+
 [ ----- DEVELOPING CODE ----- ]
 When implementing/creating a new feature/requirement, use either of the 2 git commands in terminal when in the local repo folder:
 1. (a) git flow feature start <<branch_name>> 
@@ -32,6 +35,8 @@ or
 2. git pull
 
 3. Edit the correct section of the app with your code
+
+
 
 
 [ ----- ADDING COMPLETED CODE ----- ]
