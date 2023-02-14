@@ -55,7 +55,7 @@ or
 
 5. Create Pull Request: Go to github, go to your branch and click on pull requests
 
-6. click on "New pull request"
+6. Ensure "compare" is set to your branch and click on "New pull request"
 
 7. Review changes and click "Create pull request"
 
