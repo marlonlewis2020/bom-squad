@@ -59,6 +59,8 @@ or
 
 7. Review changes and click "Create pull request"
 
+8. Add a short comment and click "Create pull request"
+
 
 
 
