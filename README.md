@@ -49,7 +49,7 @@ or
 
 2. Make NO further changes, commits or pushes to the branch.
 
-3. Checkout to develop: "git checkout master"
+3. Checkout to master: "git checkout master"
 
 4. Delete your local branch: git branch -d <<branch_name>> 
 
