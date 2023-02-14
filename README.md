@@ -55,9 +55,9 @@ or
 
 5. Go to github, go to your branch and click on pull requests
 
-6. clock on "New pull request"
+6. click on "New pull request"
 
-7. Add your notes and click "Create pull request"
+7. Review changes and click "Create pull request"
 
 
 
