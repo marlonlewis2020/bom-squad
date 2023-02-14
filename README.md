@@ -53,7 +53,7 @@ or
 
 4. Delete your local branch: git branch -d <<branch_name>> 
 
-5. Go to github, go to your branch and click on pull requests
+5. Create Pull Request: Go to github, go to your branch and click on pull requests
 
 6. click on "New pull request"
 
