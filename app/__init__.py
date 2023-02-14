@@ -10,11 +10,9 @@ env = "development" # env values = [ "production", "development", "testing" ]
 env = env.lower()
 
 if env not in ENV.keys(): env = "default"
-
 if env == "production": os.environ['FLASK_DEBUG'] = "False"
     
 env_object = ENV[env]
-
 app.config.from_object(env_object)
 
 db = SQLAlchemy(app)
