@@ -2,6 +2,7 @@
 CAPSTONE Project for BOM Squad
 
 
+
 { ----- GETTING STARTED ----- ]
 For setting up your local repository and envrionment for the first time, follow the instructions below:
 1. clone the repository into your local project folder: "git clone https://github.com/marlonlewis2020/bom-squad.git"
@@ -21,6 +22,8 @@ For setting up your local repository and envrionment for the first time, follow 
 6. Set upstream remote branch: "git push -u origin develop"
 
 
+
+
 [ ----- DEVELOPING CODE ----- ]
 When implementing/creating a new feature/requirement, use either of the 2 git commands in terminal when in the local repo folder:
 1. (a) git flow feature start <<branch_name>> 
@@ -34,6 +37,8 @@ or
 3. Edit the correct section of the app with your code
 
 
+
+
 [ ----- ADDING COMPLETED CODE ----- ]
 When completed a feature implementation, use either of the 2 git commands in terminal when in the local repo folder:
 1. (a) git flow feature publish <<branch_name>>
@@ -44,15 +49,17 @@ or
 
 2. Make NO further changes, commits or pushes to the branch.
 
-3. Checkout to develop: "git checkout master"
+3. Checkout to master: "git checkout master"
 
 4. Delete your local branch: git branch -d <<branch_name>> 
 
-5. Go to github, go to your branch and click on pull requests
+5. Create Pull Request: Go to github, go to your branch and click on pull requests
 
-6. clock on "New pull request"
+6. Ensure "compare" is set to your branch and click on "New pull request"
 
-7. Add your notes and click "Create pull request"
+7. Review changes and click "Create pull request"
+
+8. Add a short comment and click "Create pull request"
 
 
 
