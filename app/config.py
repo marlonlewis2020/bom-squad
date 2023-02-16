@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from flask import url_for
 
 
 load_dotenv()
@@ -13,7 +14,7 @@ class Config(object):
     SECRET_KEY = os.environ.get('SECRET_KEY')
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', './uploads') 
     
-    DB_URI_STRING = os.environ.get('DB_URI_STRING')
+    DB_URI_STRING="mysql://{un}:{pw}@{host}/{db}"
     USERNAME="root"
     PASSWORD=""
     DATABASE="FESCO-TEST"
