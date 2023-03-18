@@ -19,3 +19,6 @@ venv/
 # Environment Variables
 .env
 .flaskenv
+
+# Hidden files
+.hidden

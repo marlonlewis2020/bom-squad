@@ -11,5 +11,9 @@ app.config.from_object(env_object)
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+with app.app_context():
+    # db.create_all()
+    pass
 
-from app import views, models
+from app.view import views
+from app.model import models
