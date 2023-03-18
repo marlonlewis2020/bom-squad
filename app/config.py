@@ -12,16 +12,17 @@ class Config(object):
     TESTING = False
     
     SECRET_KEY = os.environ.get('SECRET_KEY')
-    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', './uploads') 
+    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', './static/uploads') 
+    RESOURCE_FOLDER = os.environ.get('RESOURCE_FOLDER', './static/resources') 
     
     DB_URI_STRING="mysql://{un}:{pw}@{host}/{db}"
+    # Database credentials
     USERNAME="root"
     PASSWORD=""
     DATABASE="FESCO-TEST"
     HOST="localhost:3306" # other_host_options, i.e "localhost:3306", "127.0.0.1:3306", "192.168.100.90"
     
-    DATABASE_URL=DB_URI_STRING.format(un=USERNAME,pw=PASSWORD,host=HOST,db=DATABASE) or 'sqlite:///' + os.path.join(BASEDIR, 'mydatabase.db')
-    SQLALCHEMY_DATABASE_URI = DATABASE_URL
+    SQLALCHEMY_DATABASE_URI = DB_URI_STRING.format(un=USERNAME,pw=PASSWORD,host=HOST,db=DATABASE) or 'sqlite:///' + os.path.join(BASEDIR, 'FESCO-TEST.db')
     
     def __repr__(self):
         return self.ENVIRONMENT
@@ -29,24 +30,16 @@ class Config(object):
     
 class ProductionConfig(Config):
     ENVIRONMENT="PRODUCTION"
-    USERNAME="root"
-    PASSWORD=""
     DATABASE="FESCO-001"
-    HOST="12.0.0.1:3306" # other_host_options, i.e "localhost:3306", "127.0.0.1:3306", "192.168.100.90"
     
-    DATABASE_URL=Config.DB_URI_STRING.format(un=USERNAME,pw=PASSWORD,host=HOST,db=DATABASE)
-    SQLALCHEMY_DATABASE_URI = DATABASE_URL 
+    SQLALCHEMY_DATABASE_URI = Config.DB_URI_STRING.format(un=Config.USERNAME,pw=Config.PASSWORD,host=Config.HOST,db=DATABASE) 
     
 
 class DevelopmentConfig(Config):
     ENVIRONMENT="DEVELOP"
-    USERNAME="root"
-    PASSWORD=""
     DATABASE="FESCO-DEVELOP"
-    HOST=Config.HOST # other_host_options, i.e "localhost:3306", "127.0.0.1:3306", "192.168.100.90"
     
-    DATABASE_URL=Config.DB_URI_STRING.format(un=USERNAME,pw=PASSWORD,host=HOST,db=DATABASE)
-    SQLALCHEMY_DATABASE_URI = DATABASE_URL
+    SQLALCHEMY_DATABASE_URI = Config.DB_URI_STRING.format(un=Config.USERNAME,pw=Config.PASSWORD,host=Config.HOST,db=DATABASE)
     
 
 class TestingConfig(Config):
@@ -60,12 +53,13 @@ ENV = {
     'testing': TestingConfig()
 }
 
-env = os.environ.get("ENV").lower() # env values i.e.  "production", "development", "testing" 
+env = ""
+if os.environ.get("ENV") is not None: os.environ['ENV'] = env = os.environ.get("ENV").lower() # env values i.e.  "production", "development", "testing" 
 
 if env not in ENV.keys() or env == "": 
-    env = "testing"
-    os.environ['ENV'] = env
+    os.environ['ENV'] = env = "testing"
 if env == "production": os.environ['FLASK_DEBUG'] = "False"
+print("ENV:", env)
 
 env_object = ENV[env]
 
