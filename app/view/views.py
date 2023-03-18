@@ -1,8 +1,15 @@
-import os
 from app import app
-from datetime import date
-# from .utils import format_date
 from flask import Flask, url_for, redirect, flash, render_template, request, session
+from app.controller.Address import Address
+from app.controller.Admin import Admin
+from app.controller.Customer import Customer
+from app.controller.Driver import Driver
+from app.controller.Order import Order
+from app.controller.Report import Report
+from app.controller.Reservation import Reservation
+from app.controller.Schedule import Schedule
+from app.controller.Truck import Truck
+from app.controller.User import User
 
 @app.route('/')
 def home():
