@@ -32,7 +32,7 @@ def home():
 # -- CUSTOMER END POINTS -- 
 
 @app.route('/api/v1/customers/<id:int>', method=['GET','PUT'])
-def get_customer(id):
+def customer(id):
     # get customer or updates customer by id
     if request.method == 'GET':
         # GET THE ORDER DETAILS
@@ -112,7 +112,7 @@ def customers():
     
 
 @app.route('/api/v1/customers/contact/<id:int>', method=['GET','POST', 'PUT'])
-def customer_contacts(id):
+def contacts(id):
     # method adds, updates, gets or marks a customer's contact as deleted
     ''' MORE DETAILS TO BE PASSED '''
     if request.method == 'GET':
@@ -130,7 +130,7 @@ def customer_contacts(id):
 # -- ORDERS END POINTS -- 
 
 @app.route('/api/v1/orders/<id:int>', method=['GET', 'PUT'])
-def orders(id):
+def order(id):
     # gets or updates an order
     if request.method ==    'GET':
         # GET THE ORDER DETAILS
