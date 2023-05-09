@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, url_for, redirect, flash
+from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from app.config import env_object 
