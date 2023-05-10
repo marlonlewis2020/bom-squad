@@ -1,16 +1,7 @@
 from app import app, db
-from flask import Flask, url_for, redirect, flash, render_template, request, session, make_response
-from model.models import Customer, User, Address
-# from app.classes.Address import Address
-# from app.classes.Admin import Admin
-# from app.classes.Customer import Customer
-# from app.classes.Driver import Driver
-# from app.classes.Order import Order
-# from app.classes.Report import Report
-# from app.classes.Reservation import Reservation
-# from app.classes.Schedule import Schedule
-# from app.classes.Truck import Truck
-# from app.classes.User import User
+from flask import Flask, url_for, redirect, request, session, make_response
+from . import Customer, User, Address
+# from app.utils import Address, Admin, Customer, Driver, Order, Report, Reservation, Schedule, Truck, User
 
 IN_PROGRESS = {
     'status': 'error',

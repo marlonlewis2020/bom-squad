@@ -15,5 +15,5 @@ with app.app_context():
     # db.create_all()
     pass
 
-from app.view import views
-from app.model import models
+from app import views
+from app import models
