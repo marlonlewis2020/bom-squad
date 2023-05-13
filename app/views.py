@@ -1,16 +1,7 @@
 from app import app, db
-from flask import Flask, url_for, redirect, flash, render_template, request, session, make_response
-from model.models import Customer, User, Address
-# from app.classes.Address import Address
-# from app.classes.Admin import Admin
-# from app.classes.Customer import Customer
-# from app.classes.Driver import Driver
-# from app.classes.Order import Order
-# from app.classes.Report import Report
-# from app.classes.Reservation import Reservation
-# from app.classes.Schedule import Schedule
-# from app.classes.Truck import Truck
-# from app.classes.User import User
+from flask import Flask, url_for, redirect, request, session, make_response
+from .models import Customer, User, Address
+# from app.utils import Address, Admin, Customer, Driver, Order, Report, Reservation, Schedule, Truck, User
 
 IN_PROGRESS = {
     'status': 'error',
@@ -31,7 +22,7 @@ def home():
 
 # -- CUSTOMER END POINTS -- 
 
-@app.route('/api/v1/customers/<id:int>', method=['GET','PUT'])
+@app.route('/api/v1/customers/<id>', methods=['GET','PUT'])
 def customer(id):
     # get customer or updates customer by id
     if request.method == 'GET':
@@ -58,8 +49,8 @@ def customer(id):
         customer = db.session.query(Customer)\
             .join(User, Customer.id==User.id)\
             .join(Address, Address.user_id==Customer.id)\
-            .add_column(Customer.id, Customer.company, Customer.branch, Customer.officer, User.phone_number, User.email,Address.street, Address.city, Address.parish, Address.country)\
-            .filter(customer.id==id).scalar()
+            .add_column(Customer.id, Customer.company, Customer.branch, Customer.officer, User.contact_number, User.email, Address.address_line_1, Address.city, Address.parish, Address.country)\
+            .filter(Customer.id==id).scalar()
         
         if customer is not None:    
             response = {
@@ -85,7 +76,7 @@ def customer(id):
     return make_response(INVALID)
 
 
-@app.route('/api/v1/customers', method=['POST'])
+@app.route('/api/v1/customers', methods=['POST'])
 def customers():
     #adds all the deatils of a customer
     if request.method == 'POST':
@@ -111,7 +102,7 @@ def customers():
     return make_response(INVALID)
     
 
-@app.route('/api/v1/customers/contact/<id:int>', method=['GET','POST', 'PUT'])
+@app.route('/api/v1/customers/contact/<id>', methods=['GET','POST', 'PUT'])
 def contacts(id):
     # method adds, updates, gets or marks a customer's contact as deleted
     ''' MORE DETAILS TO BE PASSED '''
@@ -129,7 +120,7 @@ def contacts(id):
 
 # -- ORDERS END POINTS -- 
 
-@app.route('/api/v1/orders/<id:int>', method=['GET', 'PUT'])
+@app.route('/api/v1/orders/<id>', methods=['GET', 'PUT'])
 def order(id):
     # gets or updates an order
     if request.method ==    'GET':
@@ -164,7 +155,7 @@ def order(id):
     return make_response(IN_PROGRESS)
     
     
-@app.route('/api/v1/orders', method=['GET', 'POST'])
+@app.route('/api/v1/orders', methods=['GET', 'POST'])
 def orders(): 
     # gets all or adds an order
     if request.method == 'GET':
@@ -233,19 +224,19 @@ def orders():
     return make_response(IN_PROGRESS)
 
 
-@app.route('/api/v1/orders/cancel/<id:int>', method=['GET'])
+@app.route('/api/v1/orders/cancel/<id>', methods=['GET'])
 def cancel_order(id):
     # cancels an order by order id
     return make_response(IN_PROGRESS)
 
 
-@app.route('/api/v1/orders/min-order-value', method=['GET'])
+@app.route('/api/v1/orders/min-order-value', methods=['GET'])
 def min_order_value():
     # gets the minimum order quantity that can be fulfilled by the system
     return make_response(IN_PROGRESS)
     
     
-@app.route('/api/v1/orders/schedule', method=['GET'])
+@app.route('/api/v1/orders/schedule', methods=['GET'])
 def get_schedule():
     # start=<date:dateForma/t>&end=<date:dateFormat>
     start = request.args.get('start')
@@ -255,7 +246,7 @@ def get_schedule():
     
 # -- TRUCK END POINTS --
 
-@app.route('/api/v1/trucks', method=['GET', 'POST'])
+@app.route('/api/v1/trucks', methods=['GET', 'POST'])
 def trucks():
     if request.method == 'GET':
         # get a list of all trucks
@@ -314,7 +305,7 @@ def trucks():
     return make_response(IN_PROGRESS)
     
     
-@app.route('/api/v1/trucks/assign/<id:int>', method=['PUT'])
+@app.route('/api/v1/trucks/assign/<id>', methods=['PUT'])
 def assign_order(id):
     # assigns order balance to a truck
     if request.method == 'PUT':
@@ -322,14 +313,14 @@ def assign_order(id):
         return make_response(IN_PROGRESS)
 
 
-@app.route('/api/v1/trucks/<id:int>', method=['GET'])
+@app.route('/api/v1/trucks/<id>', methods=['GET'])
 def get_truck(id):
     # get truck by id
     if request.method == 'GET':
         return make_response(IN_PROGRESS)
 
 
-@app.route('/api/v1/trucks/available', method=['GET'])
+@app.route('/api/v1/trucks/available', methods=['GET'])
 def get_available_trucks():
     # gets available trucks
     ''' VIEW RETURN EXAMPLE BELOW:
@@ -368,7 +359,7 @@ def get_available_trucks():
     return make_response(INVALID)
 
 
-@app.route('/api/v1/trucks/booked', method=['GET'])
+@app.route('/api/v1/trucks/booked', methods=['GET'])
 def get_booked_trucks():
     # gets a list of booked truck objects
     ''' VIEW RETRUN EXAMPLE BELOW:
@@ -410,7 +401,7 @@ def get_booked_trucks():
 
 # USERS END POINTS 
 
-@app.route('/api/v1/users', method=['POST'])
+@app.route('/api/v1/users', methods=['POST'])
 def users():
     if request.method == 'POST':
         # add user

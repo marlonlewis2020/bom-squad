@@ -18,7 +18,7 @@ class Config(object):
     DB_URI_STRING="mysql://{un}:{pw}@{host}/{db}"
     # Database credentials
     USERNAME="root"
-    PASSWORD=""
+    PASSWORD="iUZn3J31zO/w{{9n_9/NEQW!n"
     DATABASE="FESCO-TEST"
     HOST="localhost:3306" # other_host_options, i.e "localhost:3306", "127.0.0.1:3306", "192.168.100.90"
     
@@ -59,7 +59,7 @@ if os.environ.get("ENV") is not None: os.environ['ENV'] = env = os.environ.get("
 if env not in ENV.keys() or env == "": 
     os.environ['ENV'] = env = "testing"
 if env == "production": os.environ['FLASK_DEBUG'] = "False"
-print("ENV:", env)
+# print("ENV:", env)
 
 env_object = ENV[env]
 
@@ -69,4 +69,4 @@ os.environ['DATABASE']=env_object.DATABASE
 os.environ['HOST']=env_object.HOST
 os.environ['ENVIRONMENT']=env_object.ENVIRONMENT
     
-print("{0} ENVIRONMENT: {1}".format(" *", env_object.__repr__()))
+print("{0}ENVIRONMENT: {1}".format(" * ", env_object.__repr__()))
