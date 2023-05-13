@@ -1,23 +1,75 @@
-from app import db
-from werkzeug.security import generate_password_hash
+from . import db
+from datetime import datetime
 
+user_id = 'user.id'
 
 class User(db.Model):
-    """Example database model"""
-    # set custome table name
-    __tablename__ = "users"
-
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True)
-    email = db.Column(db.String(120), unique=True)
-    password = db.Column(db.String(255))
+    name = db.Column(db.String(50), nullable=False)
+    contact_number = db.Column(db.String(20), nullable=False)
+    email = db.Column(db.String(50), nullable=False)
+    role = db.Column(db.String(20), nullable=False)
 
-    def __init__(self, username, email, password):
-        self.username = username
-        self.email = email
-        self.password = generate_password_hash(password)
+    __mapper_args__ = {
+        'polymorphic_identity': 'user',
+        'polymorphic_on': role
+    }
 
-    def __repr__(self):
-        return '<User %r>' % self.username
+class Customer(User):
+    __tablename__ = 'customer'
+    id = db.Column(db.Integer, db.ForeignKey(user_id), primary_key=True)
+    address_id = db.Column(db.Integer, db.ForeignKey('address.id'), nullable=False)
+    company = db.Column(db.String(50), nullable=False)
+    branch = db.Column(db.String(50), nullable=False)
+    officer = db.Column(db.String(30), nullable=False)
 
+    __mapper_args__ = {
+        'polymorphic_identity': 'customer',
+    }
+
+class Driver(User):
+    __tablename__ = 'driver'
+    id = db.Column(db.Integer, db.ForeignKey(user_id), primary_key=True)
+
+    license_number = db.Column(db.String(20), nullable=False)
+    truck_id = db.Column(db.Integer, db.ForeignKey('truck.id'), nullable=False)
+    status = db.Column(db.String(20), nullable=False)
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'driver',
+    }
+
+class Admin(User):
+    __tablename__ = 'admin'
+    id = db.Column(db.Integer, db.ForeignKey(user_id), primary_key=True)
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'admin',
+    }
+
+class Order(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=False)
+    order_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    delivery_date = db.Column(db.Date, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(20), nullable=False)
+
+class Address(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    address_line_1 = db.Column(db.String(50), nullable=False)
+    city = db.Column(db.String(50), nullable=False)
+    parish = db.Column(db.String(50), nullable=False)
+    country = db.Column(db.String(50), nullable=False)
+    postal_code = db.Column(db.String(10), nullable=False)
+
+class Truck(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    license_plate = db.Column(db.String(20), nullable=False)
+    capacity = db.Column(db.Integer, nullable=False)
+    make = db.Column(db.String(50), nullable=False)
+    model = db.Column(db.String(50), nullable=False)
+    year = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(20), nullable=False)
 
