@@ -18,16 +18,12 @@ INVALID = {
 }
 
 # # # -- End-Points -- # # #
-@app.route('/')
-def home():
-    """Render website's home page."""
-    return render_template('home.html')
-
 
 # -- CUSTOMER END POINTS -- 
 
 @app.route('/api/v1/customers/<id>', methods=['GET','PUT'])
 def customer(id):
+    """ Gets a customer's details """
     # get customer or updates customer by id
     if request.method == 'GET':
         # GET THE ORDER DETAILS
@@ -38,7 +34,7 @@ def customer(id):
                 customerID: "00000001",
                 company:"Total",
                 branch:"Barbican",
-                phoneNumbers:["(876)-555-0555","(876)-555-1555"],
+                phoneNumber:"(876)-555-0555",
                 email:"totalbarbican@gmail.com",
                 purchasingOfficer:"Robert Desnoes",
                 location:"12 Barbican Road, Barbican, St. Andrew, Ja.",
@@ -80,7 +76,32 @@ def customer(id):
         
         ''' VIEW RETURN EXAMPLE BELOW:
         '''
-        return make_response(IN_PROGRESS)
+        response = {
+            "status":"error",
+            "message":"unable to update customer details"
+        }
+        form = CustomerForm()
+        cus = db.session.query(Customer, User).filter(Customer.id==id).scalar()
+        try:
+            cus.address_id = form.address_id.data
+            cus.company = form.company.data
+            cus.branch = form.branch.data
+            cus.officer = form.officer.data
+            cus.name = form.name.data
+            cus.contact_number = form.contact_number.data
+            cus.email = form.email.data
+            cus.role = form.role.data
+            cus.username = form.username.data
+            cus.password = generate_password_hash(form.password.data)
+            db.session.add(cus)
+            db.session.commit()
+            response = {
+                "status":"success"
+            }
+        except Exception as e:
+            print(e)
+            db.session.rollback()
+        return make_response(response)
     return make_response(INVALID)
 
 
@@ -202,16 +223,15 @@ def order(id):
             }    
         }
         '''
-        order = db.session.query(Order).filter_by(id=id).scalar()
-        customer = db.session.query(Customer, Address, User)\
+        customer = db.session.query(Address, Customer, User, Order)\
             .filter(
-                (Address.user_id==Customer.id)\
-                & (User.id==Customer.id)\
-                & (Customer.id==order.customer_id)\
-        ).scalar()
+                (Address.id==Customer.address_id)\
+                & (Customer.id==User.id)\
+                & (User.id==Order.customer_id)\
+                & (Order.id==id)).first()
         
-        address = "{0} {1} {2} {3}".format(customer.address_line_1, customer.city, customer.parish, customer.country)
-        response = Order.to_json( order, customer.name, address )
+        address = "{0} {1}, {2}, {3}, {4}".format(customer.Address.address_line_1, customer.Address.city, customer.Address.parish, customer.Address.country, customer.Address.postal_code)
+        response = Order.to_json( customer.Order, customer.User.name, address )
         
     elif request.method == 'PUT':
         # UPDATE THE ORDER DETAILS
@@ -269,22 +289,17 @@ def orders():
         }
         '''
         response = {
-            "status":"success",
             "data":[]
         }
-        orders = db.session.query(Order)\
-            .join(User, customer_id=User.id)\
-            .join(Customer, customer_id=Customer.id)\
-            .join(Address, Customer.address_id==Address.id)\
-            .add_column(
-                Order.id, Order.customer_id, Order.order_date, Order.delivery_date, 
-                Order.delivery_time, Order.quantity, Order.q_diesel, Order.q_87,
-                Order.q_90, Order.q_ulsd, Order.price, Order.last_updated, Order.status, 
-                User.name, Address.address_line_1, Address.city, Address.parish, Address.country, Address.postal_code)\
+        orders = db.session.query(Order, Customer, Address, User)\
+            .filter(
+                (Order.customer_id==User.id)\
+            & (User.id==Customer.id)\
+            & (Customer.address_id==Address.id))\
             .all()
         for o in orders:
-            response['data'].append(Order.to_json(o, ))
-        pass
+            response['data'].append(Order.to_json(o.Order, o.User.name, '{} {}, {}, {}, {}'.format(o.Address.address_line_1, o.Address.city, o.Address.parish, o.Address.country, o.Address.postal_code)))
+        response["status"]="success"
     elif request.method == 'POST':
         # adds an order
         ''' PARAMS EXAMPLE BELOW:
@@ -329,20 +344,36 @@ def orders():
         trucks = []
         
         # use best fit to fill the 
+        try:
+            cid = form.customer_id.data
+            d_date = form.delivery_date.data
+            d_time = form.delivery_time.data
+            q = form.quantity.data
+            qd = form.q_diesel.data
+            q87 = form.q_87.data
+            q90 = form.q_90.data
+            qul = form.q_ulsd.data
+            price = float(form.price.data)
+            status = form.status.data
+            # book trucks to match order
+            # update qty's accordingly and add order
+            order = Order(None, cid, d_date, d_time, q, qd, q87, q90, qul, price, status)
+            # if balance exists, find and lock available booked trucks nearby that can fill the balance as best as possible
+            db.session.add(order)
+            db.session.commit()
+            db.session.refresh(order)
+            
+            for truck in trucks:
+                delivery = Delivery(order.id, truck.id, form.location.data)
+                db.session.add(delivery)
+            db.session.commit()
+            response = {
+                "status": "success"
+            }
+        except Exception as e:
+            print(e)
+            db.session.rollback()
         
-        order = Order(form.customer_id.data, form.delivery_date.data, form.delivery_time.data, form.quantity.data, form.q_diesel.data, form.q_87.data, form.q_90.data, form.q_ulsd.data, form.price.data, form.status.data)
-        db.session.add(order)
-        db.session.commit()
-        db.session.refresh(order)
-        
-        for truck in trucks:
-            delivery = Delivery(order.id, truck.id, form.location.data)
-            db.session.add(delivery)
-        db.session.commit()
-        
-        response = {
-            "status": "success"
-        }
     return make_response(response)
 
 @app.route('/api/v1/orders/<id>', methods=['POST'])
@@ -350,7 +381,9 @@ def confirm_order(id, upgrade=False):
     """Confirm a pending order"""
     # if upgrade, assign the compartment for the truck in the global variable to this order id, and update the truck compartment's capacity
     # free up lock on table reords in global variable , and remove the order details from the global variable
-    # i.e. locked_trucks_by_ids = {order_id:{'truck_id':1000,'compartment_ids':[2,3]}, order_id:{'truck_id':1001,'compartment_ids':[3]}
+    # i.e. locked_trucks_by_ids = {order_id:{'truck_id':1000,'compartment_ids':[2,3]}, order_id:{'truck_id':1001,'compartment_ids':[3]} # lock only 1 truck per order for upgrade
+    # update the order qty's for the order based, if necessary
+    # if popped truck is already locked, keep popping until a truck that isn't globally locked is found
     # return status code 201 and success response
     pass
 

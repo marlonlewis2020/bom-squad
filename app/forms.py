@@ -27,15 +27,14 @@ class UserForm(FlaskForm):
 
 class OrderForm(FlaskForm):
     customer_id = IntegerField("Customer Id", validators=[InputRequired()])
-    order_date = DateField("Order date")
-    delivery_date = DateField("Delivery Date", validators=[InputRequired()])
-    delivery_time = DateTimeField("Delivery Time")
+    delivery_date = StringField("Delivery Date", validators=[InputRequired()])
+    delivery_time = StringField("Delivery Time")
     quantity = IntegerField("Order Quantity", validators=[InputRequired()])
     q_diesel = IntegerField("Diesel Quantity")
     q_87 = IntegerField("87 Quantity")
     q_90 = IntegerField("90 Quantity")
     q_ulsd = IntegerField("ULSD Quantity")
-    price = DecimalField("Price",)
+    price = DecimalField("Price")
     status = StringField("Status")
     
 class AddressForm(FlaskForm):

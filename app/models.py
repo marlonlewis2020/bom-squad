@@ -72,33 +72,21 @@ class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=False)
     order_date = db.Column(db.DateTime, default=datetime.utcnow)
-    delivery_date = db.Column(db.Date, nullable=False)
-    delivery_time = db.Column(db.DateTime)
+    delivery_date = db.Column(db.String(80), nullable=False)
+    delivery_time = db.Column(db.String(80))
     quantity = db.Column(db.Integer, nullable=False)
     q_diesel = db.Column(db.Integer)
     q_87 = db.Column(db.Integer)
     q_90 = db.Column(db.Integer)
     q_ulsd = db.Column(db.Integer)
-    price = db.Column(db.Float, default=0.00)
+    price = db.Column(db.Numeric(10,2), default=0.00)
     last_updated = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(db.String(20), default="Pending") # Pending, Cancelled, Preparing, Ready, Delivering, Delivered
     
-    def __init__(self, customer_id, delivery_date, delivery_time, quantity, q_diesel, q_87, q_90, q_ulsd, price=0.00, status="Pending"):
+    def __init__(self, id, customer_id, delivery_date, delivery_time, quantity, q_diesel, q_87, q_90, q_ulsd, price, status):
+        if id is not None: self.id = id
         self.customer_id = customer_id
-        self.delivery_date = delivery_date
-        self.delivery_time = delivery_time
-        self.quantity = quantity
-        self.q_diesel = q_diesel
-        self.q_87 = q_87
-        self.q_90 = q_90
-        self.q_ulsd = q_ulsd
-        self.price = price
-        self.status = status
-    
-    def __init__(self, id, customer_id, order_date, delivery_date, delivery_time, quantity, q_diesel, q_87, q_90, q_ulsd, price, status):
-        self.id = id
-        self.customer_id = customer_id
-        self.order_date = order_date
+        self.order_date = datetime.utcnow()
         self.delivery_date = delivery_date
         self.delivery_time = delivery_time
         self.quantity = quantity
@@ -121,21 +109,17 @@ class Order(db.Model):
             json object: Json repsonse to send to front end
         """
         return {
-            "status": "success",
-            "data":
-            {
-                "orderID":self.id,
-                "orderQuantity":self.quantity,
-                "q_diesel": self.q_diesel,
-                "q_87": self.q_87,
-                "q_90": self.q_90,
-                "q_ulsd": self.q_ulsd,
-                "customerName":customer_name,
-                "address":customer_address,
-                "deliveryDate":self.delivery_date,
-                "deliveryTime":self.delivery_time
-            }    
-        }
+            "orderID":self.id,
+            "orderQuantity":self.quantity,
+            "q_diesel": self.q_diesel,
+            "q_87": self.q_87,
+            "q_90": self.q_90,
+            "q_ulsd": self.q_ulsd,
+            "customerName":customer_name,
+            "address":customer_address,
+            "deliveryDate":self.delivery_date,
+            "deliveryTime":self.delivery_time
+        }    
 
 class Address(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -171,6 +155,7 @@ class Truck(db.Model):
     status = db.Column(db.String(20), nullable=False)
 
 class Delivery(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
     truck_id = db.Column(db.Integer, db.ForeignKey('truck.id'), nullable=False)
     address_id = db.Column(db.Integer, db.ForeignKey('address.id'), nullable=False)
