@@ -188,3 +188,7 @@ class Area(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     area_id = db.Column(db.Integer, db.ForeignKey('address.id'), nullable=False)
     neighbour_id = db.Column(db.Integer, db.ForeignKey('address.id'), nullable=False)
+    
+    def __init__(self, area_id, nbr_id):
+        self.area_id = area_id
+        self.neighbour_id = nbr_id
