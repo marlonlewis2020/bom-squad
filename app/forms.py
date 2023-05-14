@@ -36,7 +36,7 @@ class OrderForm(FlaskForm):
     q_90 = IntegerField("90 Quantity")
     q_ulsd = IntegerField("ULSD Quantity")
     price = DecimalField("Price",)
-    status = StringField("Status") # Pending, Cancelled, Confirmed, Delivering, Delivered
+    status = StringField("Status")
     
 class AddressForm(FlaskForm):
     address_line_1 = StringField("Address Line 1", validators=[InputRequired()])
