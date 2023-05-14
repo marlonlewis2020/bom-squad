@@ -71,16 +71,43 @@ class Admin(User):
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=False)
-    order_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    delivery_date = db.Column(db.Date, default=format_date(datetime.now()), nullable=False)
-    delivery_time = db.Column(db.Date, nullable=False)
+    order_date = db.Column(db.DateTime, default=datetime.utcnow)
+    delivery_date = db.Column(db.Date, nullable=False)
+    delivery_time = db.Column(db.DateTime)
     quantity = db.Column(db.Integer, nullable=False)
-    q_diesel = db.Column(db.Integer, nullable=False)
-    q_87 = db.Column(db.Integer, nullable=False)
-    q_90 = db.Column(db.Integer, nullable=False)
-    q_ulsd = db.Column(db.Integer, nullable=False)
-    price = db.Column(db.Float, nullable=False)
-    status = db.Column(db.String(20), nullable=False)
+    q_diesel = db.Column(db.Integer)
+    q_87 = db.Column(db.Integer)
+    q_90 = db.Column(db.Integer)
+    q_ulsd = db.Column(db.Integer)
+    price = db.Column(db.Float, default=0.00)
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default="Pending") # Pending, Cancelled, Preparing, Ready, Delivering, Delivered
+    
+    def __init__(self, customer_id, delivery_date, delivery_time, quantity, q_diesel, q_87, q_90, q_ulsd, price=0.00, status="Pending"):
+        self.customer_id = customer_id
+        self.delivery_date = delivery_date
+        self.delivery_time = delivery_time
+        self.quantity = quantity
+        self.q_diesel = q_diesel
+        self.q_87 = q_87
+        self.q_90 = q_90
+        self.q_ulsd = q_ulsd
+        self.price = price
+        self.status = status
+    
+    def __init__(self, id, customer_id, order_date, delivery_date, delivery_time, quantity, q_diesel, q_87, q_90, q_ulsd, price, status):
+        self.id = id
+        self.customer_id = customer_id
+        self.order_date = order_date
+        self.delivery_date = delivery_date
+        self.delivery_time = delivery_time
+        self.quantity = quantity
+        self.q_diesel = q_diesel
+        self.q_87 = q_87
+        self.q_90 = q_90
+        self.q_ulsd = q_ulsd
+        self.price = price
+        self.status = status
     
     def to_json(self, customer_name:str, customer_address:str):
         """Converts to a dictionary reponse
@@ -143,3 +170,12 @@ class Truck(db.Model):
     year = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(20), nullable=False)
 
+class Delivery(db.Model):
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
+    truck_id = db.Column(db.Integer, db.ForeignKey('truck.id'), nullable=False)
+    address_id = db.Column(db.Integer, db.ForeignKey('address.id'), nullable=False)
+    
+    def __init__(self, order_id, truck_id, address_id):
+        self.order_id = order_id
+        self.truck_id = truck_id
+        self.address_id = address_id

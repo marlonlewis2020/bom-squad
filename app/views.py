@@ -1,7 +1,8 @@
+from datetime import datetime
 from MySQLdb import IntegrityError
 from app import app, db
 from flask import Flask, url_for, redirect, request, session, make_response
-from .models import Customer, User, Address, Order
+from .models import Customer, User, Address, Order, Delivery
 from .forms import CustomerForm, AddressForm, OrderForm, UserForm
 from werkzeug.security import generate_password_hash
 # from app.utils import Address, Admin, Customer, Driver, Order, Report, Reservation, Schedule, Truck, User
@@ -49,25 +50,29 @@ def customer(id):
             'message':'Customer not found!'
         }
             
-        customer = db.session.query(Customer)\
-            .join(User, Customer.id==User.id)\
-            .join(Address, Address.user_id==Customer.id)\
-            .add_column(Customer.id, Customer.company, Customer.branch, Customer.officer, User.contact_number, User.email, Address.address_line_1, Address.city, Address.parish, Address.country)\
-            .filter(id=id).scalar()
+        customer = db.session.query(Customer, User)\
+            .filter(
+                (Customer.id==User.id)\
+                & (Customer.id==id)\
+            )\
+            .scalar()
+            # .add_column(Customer.id, Customer.company, Customer.branch, Customer.officer, User.contact_number, User.email, Address.address_line_1, Address.city, Address.parish, Address.country)\
         
-        if customer is not None:    
+        if customer is not None:  
+            location = db.session.query(Address).filter_by(id=customer.address_id).scalar() 
+            address = "{} {}, {}, {}, {}".format(location.address_line_1, location.city, location.parish, location.country, location.postal_code)
             response = {
-                'status':'success',
                 'data':{
                     'customerID':customer.id,
                     'company':customer.company,
                     'branch':customer.branch,
-                    'phoneNumber':customer.phone,
+                    'phoneNumber':customer.contact_number,
                     'email':customer.email,
-                    'purchasingOfficer':customer.purchasingOfficer,
-                    'location':customer.location
+                    'purchasingOfficer':customer.officer,
+                    'location':address
                     }
             }
+            response['status'] = 'success',
         
         return make_response(response)
     elif request.method == 'PUT':
@@ -198,10 +203,12 @@ def order(id):
         }
         '''
         order = db.session.query(Order).filter_by(id=id).scalar()
-        customer = db.session.query(Customer).join(Address, Address.user_id==Customer.id)\
-            .join(User, User.id==Customer.id)\
-            .add_column(Customer.id, User.name, Customer.company, Customer.branch, Customer.officer, Address.address_line_1, Address.city, Address.parish, Address.country) \
-            .filter_by(id=order.customer_id).scalar()
+        customer = db.session.query(Customer, Address, User)\
+            .filter(
+                (Address.user_id==Customer.id)\
+                & (User.id==Customer.id)\
+                & (Customer.id==order.customer_id)\
+        ).scalar()
         
         address = "{0} {1} {2} {3}".format(customer.address_line_1, customer.city, customer.parish, customer.country)
         response = Order.to_json( order, customer.name, address )
@@ -213,6 +220,20 @@ def order(id):
             status: "success"
         }
         '''
+        form = OrderForm()
+        order=db.session.query(Order).filter_by(id=id).scalar()
+        order.delivery_date = form.delivery_date.data
+        order.last_updated = datetime.utcnow()
+        order.delivery_time = form.delivery_time.data
+        order.quantity = form.quantity.data
+        order.q_diesel = form.q_diesel.data
+        order.q_87 = form.q_87.data
+        order.q_90 = form.q_90.data
+        order.q_ulsd = form.q_ulsd.data
+        order.price = form.price.data
+        order.status = "Pending"
+        db.session.add(order)
+        db.session.commit()
         response = {
             "status": "success"
         }
@@ -222,6 +243,9 @@ def order(id):
 @app.route('/api/v1/orders', methods=['GET', 'POST'])
 def orders(): 
     # gets all or adds an order
+    response = {
+        "status":"error"
+    }
     if request.method == 'GET':
         # gets all orders
         ''' EXAMPLE OF RETURN VALUE 
@@ -244,19 +268,35 @@ def orders():
             ]   
         }
         '''
-        db.session.query(Order).all()
+        response = {
+            "status":"success",
+            "data":[]
+        }
+        orders = db.session.query(Order)\
+            .join(User, customer_id=User.id)\
+            .join(Customer, customer_id=Customer.id)\
+            .join(Address, Customer.address_id==Address.id)\
+            .add_column(
+                Order.id, Order.customer_id, Order.order_date, Order.delivery_date, 
+                Order.delivery_time, Order.quantity, Order.q_diesel, Order.q_87,
+                Order.q_90, Order.q_ulsd, Order.price, Order.last_updated, Order.status, 
+                User.name, Address.address_line_1, Address.city, Address.parish, Address.country, Address.postal_code)\
+            .all()
+        for o in orders:
+            response['data'].append(Order.to_json(o, ))
         pass
     elif request.method == 'POST':
         # adds an order
         ''' PARAMS EXAMPLE BELOW:
-        "customerID: ""00000000""
-        orderDate:<date:dateFormat>
-        diesel: <quantity1:int>,
-        87: <quantity2:int>,
-        90: <quantity3:int>,
-        ulsd: <quantity1:int>,
-        location: <addressID>
-        delivery: <date:dateFormat>"
+        "customer_id: 3
+        q_diesel: 10,
+        q_87: 50,
+        q_90: 80,
+        q_ulsd: 20,
+        location: 5,
+        quantity: 160,
+        delivery_date: "June 3, 2023"
+        delivery_time: "12:00 PM"
         '''
         ''' RETURN EXAMPLE BLEOW:
         {
@@ -285,8 +325,25 @@ def orders():
             }
         }
         '''
-        pass
-    return make_response(IN_PROGRESS)
+        form = OrderForm()
+        trucks = []
+        
+        # use best fit to fill the 
+        
+        order = Order(form.customer_id.data, form.delivery_date.data, form.delivery_time.data, form.quantity.data, form.q_diesel.data, form.q_87.data, form.q_90.data, form.q_ulsd.data, form.price.data, form.status.data)
+        db.session.add(order)
+        db.session.commit()
+        db.session.refresh(order)
+        
+        for truck in trucks:
+            delivery = Delivery(order.id, truck.id, form.location.data)
+            db.session.add(delivery)
+        db.session.commit()
+        
+        response = {
+            "status": "success"
+        }
+    return make_response(response)
 
 @app.route('/api/v1/orders/<id>', methods=['POST'])
 def confirm_order(id, upgrade=False):
