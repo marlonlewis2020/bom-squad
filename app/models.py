@@ -69,6 +69,7 @@ class Admin(User):
     # }
 
 class Order(db.Model):
+    __tablename__="order"
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=False)
     order_date = db.Column(db.DateTime, default=datetime.utcnow)
@@ -122,6 +123,7 @@ class Order(db.Model):
         }    
 
 class Address(db.Model):
+    __tablename__="address"
     id = db.Column(db.Integer, primary_key=True)
     address_line_1 = db.Column(db.String(30), nullable=False)
     city = db.Column(db.String(30), default="")
@@ -146,6 +148,7 @@ class Address(db.Model):
         print("Address object created")
 
 class Truck(db.Model):
+    __tablename__="truck"
     id = db.Column(db.Integer, primary_key=True)
     license_plate = db.Column(db.String(20), nullable=False, unique=True)
     capacity = db.Column(db.Integer, nullable=False)
@@ -155,6 +158,7 @@ class Truck(db.Model):
     status = db.Column(db.String(20), nullable=False)
 
 class Delivery(db.Model):
+    __tablename__="delivery"
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
     truck_id = db.Column(db.Integer, db.ForeignKey('truck.id'), nullable=False)
@@ -164,3 +168,23 @@ class Delivery(db.Model):
         self.order_id = order_id
         self.truck_id = truck_id
         self.address_id = address_id
+        
+class Compartments(db.Model):
+    __tablename__="compartments"
+    id = db.Column(db.Integer, primary_key=True)
+    truck_id = db.Column(db.Integer, db.ForeignKey('truck.id'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), default=0)
+    compartment_no = db.Column(db.Integer, nullable=False)
+    capacity = db.Column(db.Integer, nullable=False)
+    
+    def __init__(self, truck_id, order_id, compartment_no, capacity):
+        self.truck_id = truck_id
+        self.order_id = order_id
+        self.compartment_no = compartment_no
+        self.capacity = capacity
+        
+class Area(db.Model):
+    __tablename__="area"
+    id = db.Column(db.Integer, primary_key=True)
+    area_id = db.Column(db.Integer, db.ForeignKey('address.id'), nullable=False)
+    neighbour_id = db.Column(db.Integer, db.ForeignKey('address.id'), nullable=False)

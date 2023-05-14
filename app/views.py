@@ -262,7 +262,11 @@ def order(id):
     
 @app.route('/api/v1/orders', methods=['GET', 'POST'])
 def orders(): 
-    # gets all or adds an order
+    """Retrieves all orders or adds an order depending on the HTTP REST verbs (GET, POST)
+
+    Returns:
+        json: a json response with status and relevant states
+    """
     response = {
         "status":"error"
     }
