@@ -1,6 +1,9 @@
+from MySQLdb import IntegrityError
 from app import app, db
 from flask import Flask, url_for, redirect, request, session, make_response
-from .models import Customer, User, Address
+from .models import Customer, User, Address, Order
+from .forms import CustomerForm, AddressForm, OrderForm, UserForm
+from werkzeug.security import generate_password_hash
 # from app.utils import Address, Admin, Customer, Driver, Order, Report, Reservation, Schedule, Truck, User
 
 IN_PROGRESS = {
@@ -50,7 +53,7 @@ def customer(id):
             .join(User, Customer.id==User.id)\
             .join(Address, Address.user_id==Customer.id)\
             .add_column(Customer.id, Customer.company, Customer.branch, Customer.officer, User.contact_number, User.email, Address.address_line_1, Address.city, Address.parish, Address.country)\
-            .filter(Customer.id==id).scalar()
+            .filter(id=id).scalar()
         
         if customer is not None:    
             response = {
@@ -81,14 +84,15 @@ def customers():
     #adds all the deatils of a customer
     if request.method == 'POST':
         ''' VIEW EXAMPLE OF PASSED PARAMS BELOW:
+            name:"John Doe",
             company:"Total",
             branch:"Barbican",
             username:"total_barbican",
             password:"password123",
             role:"customer",
-            phoneNumbers:["(876)-555-0555","(876)-555-1555"],
+            contact_number:"(876)-555-0555",
             email:"totalbarbican@gmail.com",
-            purchasingOfficer:"Robert Desnoes",
+            officer:"Robert Desnoes",
             location:"12 Barbican Road, Barbican, St. Andrew, Ja."
 
         VIEW WXAMPLE OF RETURN VALUE BELOW:
@@ -96,9 +100,58 @@ def customers():
             status: "success"
         }
         '''
-        return make_response(IN_PROGRESS)
-    elif request.method=='GET':
-        return make_response(IN_PROGRESS)
+        response = {
+                "status":"error",
+                "message":"Something went wrong while adding "
+            }
+        form = CustomerForm()
+        
+        address = form.location.data.split(",")
+        if len(address)==3:
+            address = Address(address[0], address[1], address[2])
+        elif len(address)==4:
+            address = Address(address[0], address[1], address[2], address[3])
+        elif len(address)==5:
+            address = Address(address[0], address[1], address[2], address[3], address[4])
+            
+        user = User(form.name.data or "{} {}".format(form.company.data.trim(), form.branch.data.trim()), form.contact_number.data, form.email.data, form.role.data, form.username.data, generate_password_hash(form.password.data))
+        address_added = False
+        customer_added = False
+        
+        try:
+            db.session.add(address)
+            db.session.commit()
+            address_added = True
+            db.session.refresh(address)
+            
+            customer = Customer(address.id, form.company.data, form.branch.data, form.officer.data, user) 
+            db.session.add(customer)
+            db.session.commit()
+            customer_added = True
+            db.session.refresh(customer)
+            
+            response = {
+                "status":"success"
+            }
+            
+        except Exception:
+            db.session.rollback()
+            if address_added:
+                db.session.delete(address)
+            else:
+                response['message']+= "Address data"
+                
+            if customer_added:
+                db.session.delete(user)
+                db.session.delete(customer)
+            else:
+                if not address_added: response['message']+= ", and "
+                response['message']+= "User data [Username Already exists], and Customer data"
+                
+            db.session.commit() 
+            response['message']+=". All changes have been rolled back."
+               
+        return make_response(response)
     return make_response(INVALID)
     
 
@@ -122,6 +175,7 @@ def contacts(id):
 
 @app.route('/api/v1/orders/<id>', methods=['GET', 'PUT'])
 def order(id):
+    response = IN_PROGRESS
     # gets or updates an order
     if request.method ==    'GET':
         # GET THE ORDER DETAILS
@@ -143,7 +197,15 @@ def order(id):
             }    
         }
         '''
-        pass
+        order = db.session.query(Order).filter_by(id=id).scalar()
+        customer = db.session.query(Customer).join(Address, Address.user_id==Customer.id)\
+            .join(User, User.id==Customer.id)\
+            .add_column(Customer.id, User.name, Customer.company, Customer.branch, Customer.officer, Address.address_line_1, Address.city, Address.parish, Address.country) \
+            .filter_by(id=order.customer_id).scalar()
+        
+        address = "{0} {1} {2} {3}".format(customer.address_line_1, customer.city, customer.parish, customer.country)
+        response = Order.to_json( order, customer.name, address )
+        
     elif request.method == 'PUT':
         # UPDATE THE ORDER DETAILS
         ''' VIEW RETURN EXAMPLE BELOW
@@ -151,8 +213,10 @@ def order(id):
             status: "success"
         }
         '''
-        pass
-    return make_response(IN_PROGRESS)
+        response = {
+            "status": "success"
+        }
+    return make_response(response)
     
     
 @app.route('/api/v1/orders', methods=['GET', 'POST'])
@@ -180,6 +244,7 @@ def orders():
             ]   
         }
         '''
+        db.session.query(Order).all()
         pass
     elif request.method == 'POST':
         # adds an order
@@ -223,16 +288,25 @@ def orders():
         pass
     return make_response(IN_PROGRESS)
 
+@app.route('/api/v1/orders/<id>', methods=['POST'])
+def confirm_order(id, upgrade=False):
+    """Confirm a pending order"""
+    # if upgrade, assign the compartment for the truck in the global variable to this order id, and update the truck compartment's capacity
+    # free up lock on table reords in global variable , and remove the order details from the global variable
+    # i.e. locked_trucks_by_ids = {order_id:{'truck_id':1000,'compartment_ids':[2,3]}, order_id:{'truck_id':1001,'compartment_ids':[3]}
+    # return status code 201 and success response
+    pass
 
-@app.route('/api/v1/orders/cancel/<id>', methods=['GET'])
+@app.route('/api/v1/orders/<id>', methods=['GET'])
 def cancel_order(id):
+    """Cancels the order"""
     # cancels an order by order id
-    return make_response(IN_PROGRESS)
-
-
-@app.route('/api/v1/orders/min-order-value', methods=['GET'])
-def min_order_value():
-    # gets the minimum order quantity that can be fulfilled by the system
+    # check global to see if order is pending and if so, get the order details there
+    # if order is not pending, lookup the order by the order id provided, remove the order details from the global variable
+    # using the order details, find each truck in the order by the order id, mark the order as cancelled, empty the truck compartments that have been filled by that id 
+    # free up lock on table reords in global variable 
+    # i.e. locked_trucks_by_ids = {order_id:{'truck_id':1000,'compartment_ids':[2,3]}, order_id:{'truck_id':1001,'compartment_ids':[3]}
+    # return status code 201 and success response
     return make_response(IN_PROGRESS)
     
     
@@ -415,6 +489,12 @@ def users():
 
 
 # -- helper functions -- 
+
+def min_order_value():
+    # gets the minimum order quantity that can be fulfilled by the system
+    return make_response(IN_PROGRESS)
+
+
 @app.after_request
 def add_header(response):
     """

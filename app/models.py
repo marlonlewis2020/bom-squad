@@ -1,72 +1,142 @@
 from . import db
 from datetime import datetime
+from app.utils.utils import format_date
 
 user_id = 'user.id'
 
 class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    __tablename__='user'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(50), nullable=False)
-    contact_number = db.Column(db.String(20), nullable=False)
+    contact_number = db.Column(db.String(10), nullable=False)
     email = db.Column(db.String(50), nullable=False)
     role = db.Column(db.String(20), nullable=False)
+    username = db.Column(db.String(20), unique=True, nullable=False)
+    password = db.Column(db.String(256), nullable=False)
+    
+    def __init__(self, name, contact_number, email, role, username, password):
+        self.name = name
+        self.contact_number = contact_number
+        self.email = email
+        self.role = role
+        self.username = username
+        self.password = password
+        print("User object created")
 
-    __mapper_args__ = {
-        'polymorphic_identity': 'user',
-        'polymorphic_on': role
-    }
+    # __mapper_args__ = {
+    #     'polymorphic_identity': 'user',
+    #     'polymorphic_on': role
+    # }
 
 class Customer(User):
     __tablename__ = 'customer'
-    id = db.Column(db.Integer, db.ForeignKey(user_id), primary_key=True)
+    id = db.Column(db.Integer, db.ForeignKey('user.id'), primary_key=True)
     address_id = db.Column(db.Integer, db.ForeignKey('address.id'), nullable=False)
     company = db.Column(db.String(50), nullable=False)
     branch = db.Column(db.String(50), nullable=False)
     officer = db.Column(db.String(30), nullable=False)
+    
+    def __init__(self, address_id, company, branch, officer, user):
+        super().__init__(user.name, user.contact_number, user.email, user.role, user.username, user.password)
+        self.id = user.id
+        self.address_id = address_id
+        self.company = company
+        self.branch = branch
+        self.officer = officer
+        print("Customer object created")
 
-    __mapper_args__ = {
-        'polymorphic_identity': 'customer',
-    }
+    # __mapper_args__ = {
+    #     'polymorphic_identity': 'customer',
+    # }
 
 class Driver(User):
     __tablename__ = 'driver'
     id = db.Column(db.Integer, db.ForeignKey(user_id), primary_key=True)
-
-    license_number = db.Column(db.String(20), nullable=False)
+    license_number = db.Column(db.String(20), unique=True, nullable=False)
     truck_id = db.Column(db.Integer, db.ForeignKey('truck.id'), nullable=False)
     status = db.Column(db.String(20), nullable=False)
 
-    __mapper_args__ = {
-        'polymorphic_identity': 'driver',
-    }
+    # __mapper_args__ = {
+    #     'polymorphic_identity': 'driver',
+    # }
 
 class Admin(User):
     __tablename__ = 'admin'
     id = db.Column(db.Integer, db.ForeignKey(user_id), primary_key=True)
 
-    __mapper_args__ = {
-        'polymorphic_identity': 'admin',
-    }
+    # __mapper_args__ = {
+    #     'polymorphic_identity': 'admin',
+    # }
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=False)
     order_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    delivery_date = db.Column(db.Date, nullable=False)
+    delivery_date = db.Column(db.Date, default=format_date(datetime.now()), nullable=False)
+    delivery_time = db.Column(db.Date, nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
+    q_diesel = db.Column(db.Integer, nullable=False)
+    q_87 = db.Column(db.Integer, nullable=False)
+    q_90 = db.Column(db.Integer, nullable=False)
+    q_ulsd = db.Column(db.Integer, nullable=False)
     price = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), nullable=False)
+    
+    def to_json(self, customer_name:str, customer_address:str):
+        """Converts to a dictionary reponse
+
+        Args:
+            customer_name (str): name of customer
+            customer_address (str): customer's address
+            delivery_time (str): time for the delivery
+
+        Returns:
+            json object: Json repsonse to send to front end
+        """
+        return {
+            "status": "success",
+            "data":
+            {
+                "orderID":self.id,
+                "orderQuantity":self.quantity,
+                "q_diesel": self.q_diesel,
+                "q_87": self.q_87,
+                "q_90": self.q_90,
+                "q_ulsd": self.q_ulsd,
+                "customerName":customer_name,
+                "address":customer_address,
+                "deliveryDate":self.delivery_date,
+                "deliveryTime":self.delivery_time
+            }    
+        }
 
 class Address(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    address_line_1 = db.Column(db.String(50), nullable=False)
-    city = db.Column(db.String(50), nullable=False)
-    parish = db.Column(db.String(50), nullable=False)
-    country = db.Column(db.String(50), nullable=False)
-    postal_code = db.Column(db.String(10), nullable=False)
+    address_line_1 = db.Column(db.String(30), nullable=False)
+    city = db.Column(db.String(30), default="")
+    parish = db.Column(db.String(20), nullable=False)
+    country = db.Column(db.String(30), default="Jamaica", nullable=False)
+    postal_code = db.Column(db.String(10), default="JMAKN03", nullable=False)
+    
+    def __init__(self, address_line_1, city, parish, country="Jamaica", postal_code="JMAKN03"):
+        self.address_line_1 = address_line_1
+        self.city = city
+        self.parish = parish
+        self.country = country
+        self.postal_code = postal_code
+        print("Address object created")
+    
+    def __init__(self, address_line_1, city, parish, country="Jamaica"):
+        self.address_line_1 = address_line_1
+        self.city = city
+        self.parish = parish
+        self.country = country
+        self.postal_code = "JMAKN03"
+        print("Address object created")
 
 class Truck(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    license_plate = db.Column(db.String(20), nullable=False)
+    license_plate = db.Column(db.String(20), nullable=False, unique=True)
     capacity = db.Column(db.Integer, nullable=False)
     make = db.Column(db.String(50), nullable=False)
     model = db.Column(db.String(50), nullable=False)
