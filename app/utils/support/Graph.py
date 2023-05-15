@@ -14,7 +14,7 @@ class Graph:
     available_trucks = []
     INF = float("Inf")
 
-    def __init__(self, start_node, petrol, ord_qty, date, depth, last=False):
+    def __init__(self, start_node, petrol, ord_qty, date, time, depth, last=False):
         """Graph Constructor
         """
         self.petrol = petrol
@@ -38,6 +38,7 @@ class Graph:
         self.areas_in_depth = list() # list for: areas in which to look for booked trucks with space to fill other order balances
         self.excess = list()
         self.delivery_date = date
+        self.delivery_time = time
         self.load_area_nodes()
         locations = list(self.AREAS.keys())
         
@@ -67,10 +68,11 @@ class Graph:
         
     def load_area_nodes(self):
         """Load up the graph data structure - contains areas and the trucks booked for each area"""
-        date = sql_date(strtodate(self.delivery_date))   
+        # date = sql_date(strtodate(self.delivery_date))  
+        # time = self.delivery_time
         
         # get all deliveries scheduled for this delivery date     
-        deliveries = db.session.query(Delivery.parish, Delivery.truck_id, Delivery.address_id).distinct().filter_by(date=self.delivery_date).all()
+        deliveries = self.get_deliveries()
         parishes = [x[0] for x in deliveries]
         truck_ids = [x[1] for x in deliveries]
         address_ids = [x[2] for x in deliveries]
@@ -112,8 +114,10 @@ class Graph:
                 self.AREAS[parish] = { "id":address_id, "trucks":[truck], "available_space":truck.available }
         
         if self.last:
-            self.available_trucks = db.session.query(Truck).filter(~Truck.id.in_(tuple(truck_ids))).filter_by(active=1).all()            
+            self.set_available_trucks(truck_ids)            
         
+    def set_available_trucks(self, truck_ids):
+        self.available_trucks = db.session.query(Truck).filter(~Truck.id.in_(tuple(truck_ids))).filter((Truck.active==1) & (Truck.available>0)).all()
         
     def discover( self, location ):
         """Discovers Areas by adding them to the areas PQ and updating the discovered dictionary with updated details.
@@ -198,41 +202,47 @@ class Graph:
         return all_nbrs
     
     def update_db(self, order, address, qty, truck):
-        # update qty
-        qty -= truck.available
-        # book truck/ fill truck
-        truck.available = 0
-        truck.active = 1
         try:
-            db.session.add(truck)
-            # fill compartments
-            comps = db.session.query(Compartments).filter_by(id=truck.id).all()
-            for comp in comps:
-                comp.order_id=order.id
-                comp.petrol = self.petrol
-                db.session.add(comp)
-            # update delivery table
-            delivery = Delivery(order.id, truck.id, address.id)
-            db.session.add(delivery)
-            db.session.commit()
+            # book truck/ fill truck
+            truck = db.session.query(Truck).filter_by(id=truck.id).first()
+            if qty >= truck.available and qty!=0 and truck.available > 0:
+                # update qty
+                qty -= truck.available
+                truck.available = 0
+                truck.active = 1
+                # fill compartments
+                comps = db.session.query(Compartments).filter_by(id=truck.id).all()
+                # update compartments
+                for comp in comps:
+                    comp.order_id=order.id
+                    comp.petrol = self.petrol
+                # update delivery table
+                delivery = Delivery(order.id, truck.id, address.id)
+                db.session.add(delivery)
+                # push updates and add delivery
+                db.session.commit()
         except Exception as e:
             print(e)
             db.session.rollback()
         return qty
+    
+    def get_deliveries(self):
+        return db.session.query(Delivery.parish, Delivery.truck_id, Delivery.address_id).distinct().join(Order, Order.id==Delivery.order_id).filter((Delivery.date==self.delivery_date) & (Order.delivery_time==self.delivery_time)).all()
+
         
     def fill_trucks(self, order, qty, address):
                 
-        deliveries = db.session.query(Delivery.parish, Delivery.truck_id, Delivery.address_id).distinct().filter_by(date=self.delivery_date).all()
+        deliveries = self.get_deliveries()
         truck_ids = [x[1] for x in deliveries]
         
-        self.available_trucks = db.session.query(Truck).filter(~Truck.id.in_(tuple(truck_ids))).filter_by(active=1).all()
+        self.set_available_trucks(truck_ids)
         
         av_pq = PriorityQueue()
-        excess_comps = []
+        # excess_comps = []
         for t in self.available_trucks:
             av_pq.put((-t.available, t))                
                 
-        if qty >= 0:
+        if qty > 0:
             while not av_pq.empty():
                 # go through the list of available trucks from largest to smallest
                 this_truck = av_pq.get()[1]
@@ -251,6 +261,7 @@ class Graph:
             # if still no space is found, go through the compartments of the available trucks to best fill the order by occupying cominations of a single truck's compartments
             if len(self.available_trucks):
                 # fill each
+                prev_qty = qty
                 added = False
                 
                 for truck in self.available_trucks:
@@ -268,6 +279,7 @@ class Graph:
                         # fill/update compartment from largest to smallest
                         for comp in comps:
                             if comp.Compartments.capacity <= qty:
+                                prev_qty = qty
                                 truck = comp.Truck
                                 comp.Compartments.order_id=order.id
                                 comp.Compartments.petrol = self.petrol
@@ -281,20 +293,28 @@ class Graph:
                                 # update the qty
                                 qty -= comp.Compartments.capacity
                                 result[0] = qty
-                                # update delivery table
-                                delivery = Delivery(order.id, truck.id, address.id)
-                                db.session.add(delivery)
+                                
                                 db.session.commit()
+                                
                             else:
                                 # update upgrade suggestions queue
                                 enqued = (abs(qty-comp.Truck.available), comp.Truck)
                                 result[1].put(enqued)
                                 
+                        # update delivery table
+                        delivery = Delivery(order.id, truck.id, address.id)
+                        db.session.add(delivery)
+                        db.session.commit()
+                        added = True
+                        
                     except Exception as e:
                         print(e)
                         db.session.rollback()
+                        qty = prev_qty
                         if added:
-                            db.session.delete_all(comp)
+                            db.session.delete(delivery)
+                            db.session.delete(comp.Truck)
+                            db.session.delete(comp.Compartments)
                             db.session.commit()
                 
         truck_comps = []

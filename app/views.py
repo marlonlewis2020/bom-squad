@@ -83,7 +83,7 @@ def customer(id):
         '''
         response = {
             "status":"error",
-            "message":"unable to update customer details"
+            "message":"unable to update customer details."
         }
         form = CustomerForm()
         cus = db.session.query(Customer, User).filter(Customer.id==id).scalar()
@@ -98,7 +98,6 @@ def customer(id):
             cus.role = form.role.data
             cus.username = form.username.data
             cus.password = generate_password_hash(form.password.data)
-            db.session.add(cus)
             db.session.commit()
             response = {
                 "status":"success"
@@ -165,7 +164,8 @@ def customers():
                 "status":"success"
             }
             
-        except Exception:
+        except Exception as e:
+            print (e)
             db.session.rollback()
             if address_added:
                 db.session.delete(address)
@@ -228,16 +228,22 @@ def order(id):
             }    
         }
         '''
-        customer = db.session.query(Address, Customer, User, Order)\
-            .filter(
-                (Address.id==Customer.address_id)\
-                & (Customer.id==User.id)\
-                & (User.id==Order.customer_id)\
-                & (Order.id==id)).first()
-        
-        address = "{0} {1}, {2}, {3}, {4}".format(customer.Address.address_line_1, customer.Address.city, customer.Address.parish, customer.Address.country, customer.Address.postal_code)
-        response = Order.to_json( customer.Order, customer.User.name, address )
-        
+        try:
+            customer = db.session.query(Address, Customer, User, Order)\
+                .filter(
+                    (Address.id==Customer.address_id)\
+                    & (Customer.id==User.id)\
+                    & (User.id==Order.customer_id)\
+                    & (Order.id==id)).first()
+            
+            address = "{0} {1}, {2}, {3}, {4}".format(customer.Address.address_line_1, customer.Address.city, customer.Address.parish, customer.Address.country, customer.Address.postal_code)
+            response = Order.to_json( customer.Order, customer.User.name, address )
+        except Exception as e:
+            print(e)
+            response = {
+                "status":"error",
+                "message":"Order (#{}) not found.".format(id)
+            }
     elif request.method == 'PUT':
         # UPDATE THE ORDER DETAILS
         ''' VIEW RETURN EXAMPLE BELOW
@@ -257,7 +263,7 @@ def order(id):
         order.q_ulsd = form.q_ulsd.data
         order.price = form.price.data
         order.status = "Pending"
-        db.session.add(order)
+        # update order object
         db.session.commit()
         response = {
             "status": "success"
@@ -300,15 +306,19 @@ def orders():
         response = {
             "data":[]
         }
-        orders = db.session.query(Order, Customer, Address, User)\
-            .filter(
-                (Order.customer_id==User.id)\
-            & (User.id==Customer.id)\
-            & (Customer.address_id==Address.id))\
-            .all()
-        for o in orders:
-            response['data'].append(Order.to_json(o.Order, o.User.name, '{} {}, {}, {}, {}'.format(o.Address.address_line_1, o.Address.city, o.Address.parish, o.Address.country, o.Address.postal_code)))
-        response["status"]="success"
+        try:    
+            orders = db.session.query(Order, Customer, Address, User)\
+                .filter(
+                    (Order.customer_id==User.id)\
+                & (User.id==Customer.id)\
+                & (Customer.address_id==Address.id))\
+                .all()
+            for o in orders:
+                response['data'].append(Order.to_json(o.Order, o.User.name, '{} {}, {}, {}, {}'.format(o.Address.address_line_1, o.Address.city, o.Address.parish, o.Address.country, o.Address.postal_code)))
+            response["status"]="success"
+        except Exception as e:
+            print(e)
+            response['message'] = "Could not generate list of orders"
     elif request.method == 'POST':
         # adds an order
         ''' PARAMS EXAMPLE BELOW:
@@ -351,7 +361,7 @@ def orders():
         '''
         form = OrderForm()
         balance = {}
-        added = False
+        # added = False
         
         # use best fit to fill the 
         try:
@@ -369,7 +379,7 @@ def orders():
             db.session.add(order)
             db.session.commit()
             db.session.refresh(order)
-            added = True
+            # added = True
             
             # critical operation: book trucks and fill compartments to best match order (just under or equal to original order amount)
             # keek waiting until critical operation have been performed/completed            
@@ -380,10 +390,10 @@ def orders():
             
             """ Perform critical operations """
             address = db.session.query(Address).filter_by(id=form.location.data).first()
-            q_diesel_order = Graph(address.parish, "diesel", qd, d_date, 10)
-            q_87_order = Graph(address.parish, "87", q87, d_date, 10)
-            q_90_order = Graph(address.parish, "90", q90, d_date, 10)
-            q_ulsd_order = Graph(address.parish, "ulsd", qul, d_date, 10)
+            q_diesel_order = Graph(address.parish, "diesel", qd, d_date, d_time, 10)
+            q_87_order = Graph(address.parish, "87", q87, d_date, d_time, 10)
+            q_90_order = Graph(address.parish, "90", q90, d_date, d_time, 10)
+            q_ulsd_order = Graph(address.parish, "ulsd", qul, d_date, d_time, 10)
             total_order = {
                 "q_diesel_order" : q_diesel_order,
                 "q_87_order" : q_87_order,
@@ -395,13 +405,14 @@ def orders():
             total_left = 0
             for gas in i_orders:
                 fill_order = total_order[gas]
-                result = fill_order.fill_trucks(order, fill_order.QTY, address)
-                total_left += result[0]
-                balance[gas]={
-                    "ordered":fill_order.QTY,
-                    "filled":fill_order.QTY-result[0],
-                    "upgrades":result[1]
-                }
+                if fill_order.QTY > 0:
+                    result = fill_order.fill_trucks(order, fill_order.QTY, address)
+                    total_left += result[0]
+                    balance[gas]={
+                        "ordered":fill_order.QTY,
+                        "filled":fill_order.QTY-result[0],
+                        "upgrades":result[1]
+                    }
             
             # get the filled qtys and update order qty's accordingly
             # update the balance variable with the upgrade balance
@@ -422,9 +433,12 @@ def orders():
                 "options":balance
             }
             if q==total_left:
+                # order cannot be filled. No trucks are available for the date
+                db.session.delete(order)
+                db.session.commit()
                 response = {
                     "status":"error",
-                    "message":"unable to fulfill order at this time. Please try again later."
+                    "message":"unable to fulfill order at this time. Please try a different date."
                 }
         except Exception as e:
             print(e)
