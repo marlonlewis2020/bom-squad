@@ -2,11 +2,16 @@ from datetime import datetime
 from MySQLdb import IntegrityError
 from app import app, db
 from flask import Flask, url_for, redirect, request, session, make_response
-from .models import Customer, User, Address, Order, Delivery
+from .models import Customer, User, Address, Order, Delivery, Area, Truck, Compartments
 from .forms import CustomerForm, AddressForm, OrderForm, UserForm
 from werkzeug.security import generate_password_hash
-# from app.utils import Address, Admin, Customer, Driver, Order, Report, Reservation, Schedule, Truck, User
+from app.utils.utils import strtodate, sql_date
+from queue import PriorityQueue, Queue
+from app.utils.support.Graph import Graph
 
+
+ORDER_QUEUE = Queue()
+    
 IN_PROGRESS = {
     'status': 'error',
     'message': 'In progress!'
@@ -134,11 +139,11 @@ def customers():
         
         address = form.location.data.split(",")
         if len(address)==3:
-            address = Address(address[0], address[1], address[2])
+            address = Address(address[0].strip(), address[1].strip(), address[2].strip())
         elif len(address)==4:
-            address = Address(address[0], address[1], address[2], address[3])
+            address = Address(address[0].strip(), address[1].strip(), address[2].strip(), address[3].strip())
         elif len(address)==5:
-            address = Address(address[0], address[1], address[2], address[3], address[4])
+            address = Address(address[0].strip(), address[1].strip(), address[2].strip(), address[3].strip(), address[4].strip())
             
         user = User(form.name.data or "{} {}".format(form.company.data.trim(), form.branch.data.trim()), form.contact_number.data, form.email.data, form.role.data, form.username.data, generate_password_hash(form.password.data))
         address_added = False
@@ -346,6 +351,7 @@ def orders():
         '''
         form = OrderForm()
         trucks = []
+        added = False
         
         # use best fit to fill the 
         try:
@@ -359,24 +365,66 @@ def orders():
             qul = form.q_ulsd.data
             price = float(form.price.data)
             status = form.status.data
-            # book trucks to match order
-            # update qty's accordingly and add order
+            balance = 0
             order = Order(None, cid, d_date, d_time, q, qd, q87, q90, qul, price, status)
-            # if balance exists, find and lock available booked trucks nearby that can fill the balance as best as possible
             db.session.add(order)
             db.session.commit()
             db.session.refresh(order)
+            added = True
             
-            for truck in trucks:
-                delivery = Delivery(order.id, truck.id, form.location.data)
-                db.session.add(delivery)
+            # critical operation: book trucks and fill compartments to best match order (just under or equal to original order amount)
+            # keek waiting until critical operation have been performed/completed            
+            # async/sequential operation on database
+            ORDER_QUEUE.put(order.id)
+            while not ORDER_QUEUE.empty() and ORDER_QUEUE.queue[0] != order.id:
+                continue
+            
+            """ Perform critical operations """
+            address = db.session.query(Address).filter_by(id=form.location.data).first()
+            q_diesel_order = Graph(address.parish, qd, d_date, 10)
+            q_87_order = Graph(address.parish, q87, d_date, 10)
+            q_90_order = Graph(address.parish, q90, d_date, 10)
+            q_ulsd_order = Graph(address.parish, qul, d_date, 10)
+            total_order = {
+                "q_diesel_order" : q_diesel_order,
+                "q_87_order" : q_87_order,
+                "q_90_order" : q_90_order,
+                "q_ulsd_order" : q_ulsd_order
+            }
+            
+            i_orders = total_order.keys()
+                
+            for gas in i_orders:
+                fill_order = total_order[gas]
+                result = fill_order.fill_trucks(order, fill_order.QTY, address)
+            
+            # get the filled qtys and update order qty's accordingly
+    
+            # update the balance variable with the upgrade balance
+            
+            # update the existing order using order object
+            
+            # release lock
+            ORDER_QUEUE.get()
+            
+            # for truck in trucks:
+                
             db.session.commit()
             response = {
-                "status": "success"
+                "status": "success",
+                "ordr_filled":q,
+                "upgrade_amount":balance
             }
         except Exception as e:
             print(e)
+            # remove order id
+            if not ORDER_QUEUE.empty():
+                ORDER_QUEUE.get()
             db.session.rollback()
+            if added:
+                db.session.delete(order)
+                db.session.commit()
+                response['message'] = "Unable to add order."
         
     return make_response(response)
 

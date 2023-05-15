@@ -36,6 +36,7 @@ class OrderForm(FlaskForm):
     q_ulsd = IntegerField("ULSD Quantity")
     price = DecimalField("Price")
     status = StringField("Status")
+    location = IntegerField("Address Id", validators=[InputRequired()])
     
 class AddressForm(FlaskForm):
     address_line_1 = StringField("Address Line 1", validators=[InputRequired()])

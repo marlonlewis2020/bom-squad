@@ -2,49 +2,51 @@
 # ID: 620001669
 
 from queue import PriorityQueue
-from ....app import db
-from ....app.models import Order, Area, Truck
+from app import db
+from app.models import Order, Area, Truck, Address, Delivery, Compartments
+from datetime import datetime
+from app.utils.utils import format_date, sql_date, strtodate
 
 class Graph:
     # Class for Building Graph's Adjacency Matrix
-    
-    AREAS = {} # Area Data and Trucks
-    """{"Kingston": { "id":1, "node":{}, "trucks":[], "available_space":0 }, 
-        "St. Catherine": { "id":2, "node":{}, "trucks":[], "available_space":60 }, 
-        "Clarendon": { "id":3, "node":{}, "trucks":[], "available_space":10 }, ...}"""
-    QTY = 0
-    DEPTH = {}
+    available_trucks = []
     INF = float("Inf")
-    NBRS = [] # Edges depicting space available
-    """[ (0, (None, "Kingston")), (1, ("Kingston", "St. Catherine")), (1, ("Kingston", "Clarendon")),
-        (1, ("St.Catherine", "Clarendon")), (3, ("St. Catherine", "Manchester")), ... ]"""
-    
-    # (weight, ())
 
-    discovered = {}
-    adjacency_list = {}
-    booked_areas = PriorityQueue()
-
-    def __init__(self, start_node, ord_qty, depth):
+    def __init__(self, start_node, ord_qty, date, depth, last=False):
         """Graph Constructor
         """
+        self.last = last
+        self.DEPTH = {}
+        self.discovered = {}
+        self.adjacency_list = {}
+        self.booked_areas = PriorityQueue()
+        self.AREAS = {} # Area Data and Trucks
+        """{"Kingston": { "id":1, "node":{}, "trucks":[], "available_space":0 }, 
+        "St. Catherine": { "id":2, "node":{}, "trucks":[], "available_space":60 }, 
+        "Clarendon": { "id":3, "node":{}, "trucks":[], "available_space":10 }, ...}"""
+        self.NBRS = [] # Edges depicting space available
+        """[ (0, (None, "Kingston")), (1, ("Kingston", "St. Catherine")), (1, ("Kingston", "Clarendon")),
+        (1, ("St.Catherine", "Clarendon")), (3, ("St. Catherine", "Manchester")), ... ]"""
         self.QTY = ord_qty
         self.DEPTH['max_depth'] = depth
         self.DEPTH[start_node] = 1
-        self.load_area_nodes()
         self.start_node = start_node
         self.visited = []
         self.pq = list()
         self.excess = list()
-        locations = self.AREAS.keys()
+        self.delivery_date = date
+        self.load_area_nodes()
+        locations = list(self.AREAS.keys())
         
+        # get the booked areas (based on orders made) and initialize them
         for area in locations:
             # initialize discovered, adjacency matrix, distance matrix and other properties
             self.discovered[area] = [self.INF, None, self.AREAS[area]]
             self.adjacency_list[area] = []
         
+        # update the initialized areas with accurate data in adjacency list
         for area in locations:
-            nbrs = self.neighbours(self.AREAS[area])
+            nbrs = self.neighbours(area)
             for i, nbr in enumerate(nbrs):
                 if nbr == None: continue
                 # print(self.adjacency_list[nbr], i)
@@ -62,14 +64,53 @@ class Graph:
         
     def load_area_nodes(self):
         """Load up the graph data structure - contains areas and the trucks booked for each area"""
-        all_nodes = db.session.query(Area).filter_by().all() # filter by field that states if the area has any trucks assigned
-        for node in all_nodes:
-            area_location = node.location # get field that identifies the location
-            area_trucks = db.session.query(Truck).filter_by(location=area_location).all() # filter by field that identifies the area
-            self.AREAS[area_location] = { "id":node.id, "node":node, "trucks":area_trucks, "available_space":node.available_space }
-            for nbr in self.neighbours(area_location):
-                self.NBRS.append((nbr.space, (area_location, nbr)))
+        date = sql_date(strtodate(self.delivery_date))   
+        
+        # get all deliveries scheduled for this delivery date     
+        deliveries = db.session.query(Delivery.parish, Delivery.truck_id, Delivery.address_id).distinct().filter_by(date=self.delivery_date).all()
+        parishes = [x[0] for x in deliveries]
+        truck_ids = [x[1] for x in deliveries]
+        address_ids = [x[2] for x in deliveries]
+        
+        # get and loads areas and their neighbours
+        # only get Areas where they have Orders on that date
+        all_area_nbrs = db.session.query(Area).filter(Area.area.in_(tuple(parishes))).all() 
+        
+        #add areas and nbrs
+        for node in all_area_nbrs:
+            ter = [node.area, node.neighbour]
+            area_index = parishes.index(node.area)
+            address_id = address_ids[area_index]
+            # add areas
+            if self.AREAS.get(ter[0], None) is None:
+                self.AREAS[ter[0]] = { "id":address_id, "trucks":[], "available_space":0 }
                 
+            # add neighbours
+            nbring = (None, (ter[0], ter[1]))
+            if nbring not in self.NBRS:
+                self.NBRS.append(nbring)
+                
+        # get the Trucks, and Delivery for those booked areas
+        booked_trucks = db.session.query(Truck).filter(
+            (Truck.id.in_(truck_ids))
+        ).all()
+        
+        # add booked Trucks to their respective areas
+        for truck in booked_trucks:
+            index = truck_ids.index(truck.id)
+            parish = parishes[index]
+            address_id = address_ids[index]
+            
+            if self.AREAS.get(parish, None) is not None: 
+                if truck not in self.AREAS[parish]['trucks']:
+                    self.AREAS[parish]['trucks'].append(truck) # add truck to list of trucks for this area
+                    self.AREAS[parish]['available_space'] += truck.available # update the total available space of total truck booked for this area
+            else: 
+                self.AREAS[parish] = { "id":address_id, "trucks":[truck], "available_space":truck.available }
+        
+        if self.last:
+            self.available_trucks = db.session.query(Truck).filter(~Truck.id.in_(tuple(truck_ids))).filter_by(active=0).all()            
+        
         
     def discover( self, location ):
         """Discovers Areas by adding them to the areas PQ and updating the discovered dictionary with updated details.
@@ -137,8 +178,9 @@ class Graph:
         all_nbrs = []
         # initialize empty list of neighbours
         for nbrs in self.NBRS:
-            if area.casefold() in list( map( str.casefold, nbrs[1] ) ): 
-                ind = (0, 1) [ nbrs[1].index(area.casefold()) == 0 ]
+            nbr_list = list( map( str.casefold, nbrs[1] ) )
+            if area.casefold() in nbr_list: 
+                ind = (0, 1) [ nbr_list.index(area.casefold()) == 0 ]
                 # gets the neighbour index
                 nbr = nbrs[1][ind]
                 # gets the neighbour node
@@ -147,8 +189,64 @@ class Graph:
                     # adds the neighbour to the neighbours list
         return all_nbrs
     
+    def fill_trucks(self, order, qty, address):
+        trucks_pq = PriorityQueue()
+        trucks_pq_excess = PriorityQueue()
+        self.discover( address.parish )
+        # filled_trucks = []
+        
+        # fill trucks
+                
+        deliveries = db.session.query(Delivery.parish, Delivery.truck_id, Delivery.address_id).distinct().filter_by(date=self.delivery_date).all()
+        truck_ids = [x[1] for x in deliveries]
+        
+        self.available_trucks = db.session.query(Truck).filter(~Truck.id.in_(tuple(truck_ids))).filter_by(active=0).all()
+        
+        temp = []
+        av_pq = PriorityQueue()
+        for t in self.available_trucks:
+            av_pq.put((-t.available, t))                
+                
+        if qty >= 0:
+            while not av_pq.empty():
+                # go through the list of available trucks from largest to smallest
+                this_truck = av_pq.get()
+                # the first truck to satisfy fill_order.QTY >= truck.available then fill it
+                if qty >= this_truck.available:
+                    # update qty
+                    qty -= this_truck.available
+                    # book truck/ fill truck
+                    this_truck.available = 0
+                    db.session.add(this_truck)
+                    # fill compartments
+                    comps = db.session.query(Truck).filter_by(id=this_truck.id).all()
+                    for comp in comps:
+                        comp.order_id=order.id
+                        db.session.add(comp)
+                    # update delivery table
+                    delivery = Delivery(order.id, this_truck.id, address.id)
+                    db.session.add(delivery)
+                else:
+                    break
+                     
+            # fill the order balance (qty) using the available booked trucks
+            # if no available truck meets criteria then go through the booked trucks for available space 
+            
+            # if still no space is found, go through the compartments of the available trucks to best fill the order by occupying cominations of a single truck's compartments
+            pass
+                
+                
+                truck_pri = qty - truck.available_space
+                trucks_pq.put((truck_pri, truck))
+            else: 
+                truck_pri = truck.available_space - qty
+                trucks_pq_excess.put((truck_pri, truck))
+                
+        # mark this area as visited
+        self.visited.append(area)
+        yield qty
     
-    def find_best_fit( self, area ):
+    def find_best_fit( self, order, qty, address ):
         """Routine to discover and visit nodes in search for next best fit truck
 
         Args:
@@ -158,12 +256,12 @@ class Graph:
         """
         trucks_pq = PriorityQueue()
         trucks_pq_excess = PriorityQueue()
-        self.discover( area )
+        self.discover( address.parish )
         
         # add trucks from this area to the priority queues
         area_trucks = self.AREAS[area]['trucks']
         for truck in area_trucks:
-            if self.QTY >= truck.available_space: 
+            if self.QTY >= truck.available: 
                 truck_pri = self.QTY - truck.available_space
                 trucks_pq.put((truck_pri, truck))
             else: 

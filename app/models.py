@@ -1,6 +1,6 @@
 from . import db
 from datetime import datetime
-from app.utils.utils import format_date
+from app.utils.utils import format_date, strtodate
 
 user_id = 'user.id'
 
@@ -73,8 +73,8 @@ class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=False)
     order_date = db.Column(db.DateTime, default=datetime.utcnow)
-    delivery_date = db.Column(db.String(80), nullable=False)
-    delivery_time = db.Column(db.String(80))
+    delivery_date = db.Column(db.Date, nullable=False)
+    delivery_time = db.Column(db.String(20))
     quantity = db.Column(db.Integer, nullable=False)
     q_diesel = db.Column(db.Integer)
     q_87 = db.Column(db.Integer)
@@ -88,7 +88,7 @@ class Order(db.Model):
         if id is not None: self.id = id
         self.customer_id = customer_id
         self.order_date = datetime.utcnow()
-        self.delivery_date = delivery_date
+        self.delivery_date = (delivery_date, strtodate(delivery_date))[type(delivery_date)==str]
         self.delivery_time = delivery_time
         self.quantity = quantity
         self.q_diesel = q_diesel
@@ -152,10 +152,11 @@ class Truck(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     license_plate = db.Column(db.String(20), nullable=False, unique=True)
     capacity = db.Column(db.Integer, nullable=False)
+    available = db.Column(db.Integer, nullable=False)
     make = db.Column(db.String(50), nullable=False)
     model = db.Column(db.String(50), nullable=False)
     year = db.Column(db.Integer, nullable=False)
-    status = db.Column(db.String(20), nullable=False)
+    active = db.Column(db.Boolean, default=0)
 
 class Delivery(db.Model):
     __tablename__="delivery"
@@ -163,11 +164,19 @@ class Delivery(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
     truck_id = db.Column(db.Integer, db.ForeignKey('truck.id'), nullable=False)
     address_id = db.Column(db.Integer, db.ForeignKey('address.id'), nullable=False)
+    parish = db.Column(db.String(20), nullable=False)
+    date = db.Column(db.String(25), nullable=False)
+    time = db.Column(db.String(20), nullable=False)
     
     def __init__(self, order_id, truck_id, address_id):
         self.order_id = order_id
         self.truck_id = truck_id
         self.address_id = address_id
+        address = db.session.query(Address).filter_by(id=address_id).first()
+        self.parish = address.parish
+        order = db.session.query(Order).filter_by(id=order_id).first()
+        self.date = format_date(order.delivery_date)
+        self.time = order.delivery_time
         
 class Compartments(db.Model):
     __tablename__="compartments"
@@ -185,10 +194,9 @@ class Compartments(db.Model):
         
 class Area(db.Model):
     __tablename__="area"
-    id = db.Column(db.Integer, primary_key=True)
-    area_id = db.Column(db.Integer, db.ForeignKey('address.id'), nullable=False)
-    neighbour_id = db.Column(db.Integer, db.ForeignKey('address.id'), nullable=False)
+    area = db.Column(db.String(20), primary_key=True)
+    neighbour = db.Column(db.String(20), primary_key=True)
     
     def __init__(self, area_id, nbr_id):
-        self.area_id = area_id
-        self.neighbour_id = nbr_id
+        self.area = area_id
+        self.neighbour = nbr_id
