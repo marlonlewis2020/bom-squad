@@ -381,10 +381,10 @@ def orders():
             
             """ Perform critical operations """
             address = db.session.query(Address).filter_by(id=form.location.data).first()
-            q_diesel_order = Graph(address.parish, qd, d_date, 10)
-            q_87_order = Graph(address.parish, q87, d_date, 10)
-            q_90_order = Graph(address.parish, q90, d_date, 10)
-            q_ulsd_order = Graph(address.parish, qul, d_date, 10)
+            q_diesel_order = Graph(address.parish, "diesel", qd, d_date, 10)
+            q_87_order = Graph(address.parish, "87", q87, d_date, 10)
+            q_90_order = Graph(address.parish, "90", q90, d_date, 10)
+            q_ulsd_order = Graph(address.parish, "ulsd", qul, d_date, 10)
             total_order = {
                 "q_diesel_order" : q_diesel_order,
                 "q_87_order" : q_87_order,

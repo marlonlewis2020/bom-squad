@@ -185,6 +185,7 @@ class Compartments(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'), default=0)
     compartment_no = db.Column(db.Integer, nullable=False)
     capacity = db.Column(db.Integer, nullable=False)
+    petrol = db.Column(db.String(5), default="")
     
     def __init__(self, truck_id, order_id, compartment_no, capacity):
         self.truck_id = truck_id

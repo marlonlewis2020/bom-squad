@@ -12,9 +12,10 @@ class Graph:
     available_trucks = []
     INF = float("Inf")
 
-    def __init__(self, start_node, ord_qty, date, depth, last=False):
+    def __init__(self, start_node, petrol, ord_qty, date, depth, last=False):
         """Graph Constructor
         """
+        self.petrol = petrol
         self.last = last
         self.DEPTH = {}
         self.discovered = {}
@@ -32,7 +33,7 @@ class Graph:
         self.DEPTH[start_node] = 1
         self.start_node = start_node
         self.visited = []
-        self.pq = list()
+        self.areas_in_depth = list() # list for: areas in which to look for booked trucks with space to fill other order balances
         self.excess = list()
         self.delivery_date = date
         self.load_area_nodes()
@@ -40,8 +41,8 @@ class Graph:
         
         # get the booked areas (based on orders made) and initialize them
         for area in locations:
-            # initialize discovered, adjacency matrix, distance matrix and other properties
-            self.discovered[area] = [self.INF, None, self.AREAS[area]]
+            # initialize discovered, adjacency list
+            self.discovered[area] = self.INF
             self.adjacency_list[area] = []
         
         # update the initialized areas with accurate data in adjacency list
@@ -59,7 +60,7 @@ class Graph:
         self.DEPTH = {}
         self.load_area_nodes()
         self.visited = []
-        self.pq = list()
+        self.areas_in_depth = list()
         self.excess = list()
         
     def load_area_nodes(self):
@@ -118,43 +119,48 @@ class Graph:
         Args:
             ele (str): area name
         """ 
-        area = location.casefold()
-        area_depth = self.DEPTH.get(area, 1)
+        area_depth = self.DEPTH.get(location, 1)
         if area_depth <= self.DEPTH['max_depth']:
             # check if area isn't already visited
-            if area not in self.visited:
-                next_depth = self.DEPTH[area] + 1
-                available = self.AREAS[area]['available_space']
+            if location not in self.visited:
+                next_depth = self.DEPTH[location] + 1
+                available = self.AREAS[location]['available_space']
                 
                 # Add the current area to the PQ, if it isn't already in the PQ and Discovered Queue
-                if self.discovered.get(area, None) is None:
-                    area_space = [None, area]
-                    self.pq.append(area_space)
-                    self.discovered[area] = [available, None, area]
+                area = self.discovered.get(location, self.INF)
+                if area is self.INF:
+                    self.discovered[location] = available
+                
+                self.areas_in_depth.append(location)
                 
                 # check if max_depth reached, if not - get neighbours
                 if area_depth < self.DEPTH['max_depth']:
                     
                     # discover neighbour and add them to PQ
-                    nbrs = self.neighbours( area )
+                    nbrs = self.neighbours( location )
+                    
                     for nbr in nbrs:
                         # set depth for the neighbours
-                        if next_depth < self.DEPTH[nbr] or self.DEPTH[nbr] is None: self.DEPTH[nbr] = next_depth
-                        wt = self.get_nbr_element( area, nbr )[0]
+                        if next_depth < self.DEPTH.get(nbr, self.INF) or self.DEPTH[nbr] is None: 
+                            self.DEPTH[nbr] = next_depth
+                        wt = self.AREAS.get( nbr, self.INF )
                         
-                        # Get total weight (wt) from area to each neighbour
-                        nbr_sum = available + wt
+                        if wt is not self.INF:
+                            # Get total weight (wt) from area to each neighbour
+                            nbr_sum = available + wt
                         
-                        self.booked_areas.put((nbr_sum, nbr))
+                            self.booked_areas.put((nbr_sum, nbr))
+                            
+                            # if value from area to a nbr is less than what is already in discovered, and neighbour not yet visited
+                            if nbr_sum < self.discovered[nbr] and nbr not in self.visited:
+                                                            
+                                # updates nbr node in discovered, and add them to PQ
+                                self.discovered[nbr] = nbr_sum
+                                # trcks space less than the order quantity for each area in Priority Queue
+                                self.areas_in_depth.append(nbr)
+                            self.discover(nbr)
+                    
                         
-                        # if value from area to a nbr is less than what is already in discovered, and neighbour not yet visited
-                        if nbr_sum < self.discovered[nbr][0] and nbr not in self.visited:
-                                                        
-                            # updates nbr node in discovered, and add them to PQ
-                            self.discovered[nbr] = [nbr_sum, area, nbr] 
-                            # trcks space less than the order quantity for each area in Priority Queue
-                            self.pq.append([area, nbr])
-                        self.discover(nbr)
     
     def get_booked_areas(self):
         """
@@ -189,20 +195,36 @@ class Graph:
                     # adds the neighbour to the neighbours list
         return all_nbrs
     
-    def fill_trucks(self, order, qty, address):
-        trucks_pq = PriorityQueue()
-        trucks_pq_excess = PriorityQueue()
-        self.discover( address.parish )
-        # filled_trucks = []
+    def update_db(self, order, address, qty, truck):
+        # update qty
+        qty -= truck.available
+        # book truck/ fill truck
+        truck.available = 0
+        try:
+            db.session.add(truck)
+            # fill compartments
+            comps = db.session.query(Compartments).filter_by(id=truck.id).all()
+            for comp in comps:
+                comp.order_id=order.id
+                comp.petrol = self.petrol
+                db.session.add(comp)
+            # update delivery table
+            delivery = Delivery(order.id, truck.id, address.id)
+            db.session.add(delivery)
+            db.session.commit()
+        except Exception as e:
+            print(e)
+            db.session.rollback()
+        return qty
         
-        # fill trucks
+    def fill_trucks(self, order, qty, address):
+        upgrade = (PriorityQueue())      
                 
         deliveries = db.session.query(Delivery.parish, Delivery.truck_id, Delivery.address_id).distinct().filter_by(date=self.delivery_date).all()
         truck_ids = [x[1] for x in deliveries]
         
         self.available_trucks = db.session.query(Truck).filter(~Truck.id.in_(tuple(truck_ids))).filter_by(active=0).all()
         
-        temp = []
         av_pq = PriorityQueue()
         for t in self.available_trucks:
             av_pq.put((-t.available, t))                
@@ -210,41 +232,25 @@ class Graph:
         if qty >= 0:
             while not av_pq.empty():
                 # go through the list of available trucks from largest to smallest
-                this_truck = av_pq.get()
+                this_truck = av_pq.get()[1]
                 # the first truck to satisfy fill_order.QTY >= truck.available then fill it
                 if qty >= this_truck.available:
-                    # update qty
-                    qty -= this_truck.available
-                    # book truck/ fill truck
-                    this_truck.available = 0
-                    db.session.add(this_truck)
-                    # fill compartments
-                    comps = db.session.query(Truck).filter_by(id=this_truck.id).all()
-                    for comp in comps:
-                        comp.order_id=order.id
-                        db.session.add(comp)
-                    # update delivery table
-                    delivery = Delivery(order.id, this_truck.id, address.id)
-                    db.session.add(delivery)
+                    qty = self.update_db(order, address, qty, this_truck)
                 else:
                     break
                      
             # fill the order balance (qty) using the available booked trucks
             # if no available truck meets criteria then go through the booked trucks for available space 
-            
+            result = self.find_best_fit(order, qty, address)
             # if still no space is found, go through the compartments of the available trucks to best fill the order by occupying cominations of a single truck's compartments
-            pass
-                
-                
-                truck_pri = qty - truck.available_space
-                trucks_pq.put((truck_pri, truck))
-            else: 
-                truck_pri = truck.available_space - qty
-                trucks_pq_excess.put((truck_pri, truck))
-                
-        # mark this area as visited
-        self.visited.append(area)
-        yield qty
+            if result[0] == 0:
+                return result[0], []
+        truck = result[1].get().id
+        truck_comps = db.session.query(Compartments.capacity).filter_by(truck_id=truck.id).filter_by(order_id=None).all()
+        # store truck in global variable on server
+        # lock truck in server for update
+        return result[0]
+        
     
     def find_best_fit( self, order, qty, address ):
         """Routine to discover and visit nodes in search for next best fit truck
@@ -254,25 +260,24 @@ class Graph:
             qty (_type_): _description_
             location (_type_): _description_
         """
-        trucks_pq = PriorityQueue()
-        trucks_pq_excess = PriorityQueue()
+        trucks_pq = PriorityQueue() # automatically fill order using this queue
+        trucks_pq_excess = PriorityQueue() # provide upgrade options using this queue
         self.discover( address.parish )
         
         # add trucks from this area to the priority queues
-        area_trucks = self.AREAS[area]['trucks']
+        area_trucks = self.AREAS[address.parish]['trucks']
         for truck in area_trucks:
-            if self.QTY >= truck.available: 
-                truck_pri = self.QTY - truck.available_space
+            truck_pri = abs(qty - truck.available)
+            if qty >= truck.available: 
                 trucks_pq.put((truck_pri, truck))
             else: 
-                truck_pri = truck.available_space - self.QTY
                 trucks_pq_excess.put((truck_pri, truck))
                 
         # mark this area as visited
-        self.visited.append(area)
+        self.visited.append(address.parish)
         
-        # go through all the areas in the pq
-        for _, nbr in self.pq:
+        # go through all the other areas (in the areas_in_depth list)
+        for nbr in self.areas_in_depth:
                         
             if nbr is not None:
                 
@@ -282,14 +287,21 @@ class Graph:
                 # add trucks from this neighbouring area to the priority queues
                 nbr_trucks = self.AREAS[nbr]['trucks']
                 for truck in nbr_trucks:
-                    if self.QTY >= truck.available_space: 
-                        truck_pri = self.QTY - truck.available_space
+                    truck_pri = abs(qty - truck.available)
+                    if qty >= truck.available: 
                         trucks_pq.put((truck_pri, truck))
                     else: 
-                        truck_pri = truck.available_space - self.QTY
                         trucks_pq_excess.put((truck_pri, truck))
-        # return priority queues to use in best fit                           
-        return trucks_pq, trucks_pq_excess
+        
+        # go through the trucks_pq to get the best fit while  
+        while not trucks_pq.empty():
+            diff, truck = trucks_pq.get()
+            if diff >= 0:
+                qty = self.update_db(order, address, qty, truck)
+                if qty == 0: break
+        
+        # return best fit upgrade recommendation queues                                  
+        return qty, trucks_pq_excess
             
     def get_nbr_element(self, ele, nbr ):
         """Provides a list with the wieght, start area and end area, if a neighbour relationship exists between the nodes
@@ -301,10 +313,12 @@ class Graph:
         Returns:
             list: [weight, start_node, end_node] | None
         """
+        ele_min = ele.casefold()
+        nbr_min = nbr.casefold()
         for nbrs in self.NBRS:
             edge = list(map(str.casefold,nbrs[1]))
-            if ele.casefold() in edge and nbr.casefold() in edge:
-                src = (0, 1) [edge.index(ele) == 0]
+            if ele_min in edge and nbr_min in edge:
+                src = (0, 1) [edge.index(ele_min) == 0]
                 dst = 1-src
                 return [nbrs[0], nbrs[1][src], nbrs[1][dst]]
         return [self.INF, ele, nbr]
