@@ -182,7 +182,7 @@ class Compartments(db.Model):
     __tablename__="compartments"
     id = db.Column(db.Integer, primary_key=True)
     truck_id = db.Column(db.Integer, db.ForeignKey('truck.id'), nullable=False)
-    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), default=0)
+    order_id = db.Column(db.Integer, default=0)
     compartment_no = db.Column(db.Integer, nullable=False)
     capacity = db.Column(db.Integer, nullable=False)
     petrol = db.Column(db.String(5), default="")

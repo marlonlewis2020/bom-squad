@@ -350,7 +350,7 @@ def orders():
         }
         '''
         form = OrderForm()
-        trucks = []
+        balance = {}
         added = False
         
         # use best fit to fill the 
@@ -365,7 +365,6 @@ def orders():
             qul = form.q_ulsd.data
             price = float(form.price.data)
             status = form.status.data
-            balance = 0
             order = Order(None, cid, d_date, d_time, q, qd, q87, q90, qul, price, status)
             db.session.add(order)
             db.session.commit()
@@ -393,14 +392,20 @@ def orders():
             }
             
             i_orders = total_order.keys()
-                
+            total_left = 0
             for gas in i_orders:
                 fill_order = total_order[gas]
                 result = fill_order.fill_trucks(order, fill_order.QTY, address)
+                total_left += result[0]
+                balance[gas]={
+                    "ordered":fill_order.QTY,
+                    "filled":fill_order.QTY-result[0],
+                    "upgrades":result[1]
+                }
             
             # get the filled qtys and update order qty's accordingly
-    
             # update the balance variable with the upgrade balance
+    
             
             # update the existing order using order object
             
@@ -411,20 +416,26 @@ def orders():
                 
             db.session.commit()
             response = {
-                "status": "success",
-                "ordr_filled":q,
-                "upgrade_amount":balance
+                "status":"success",
+                "ordered":q,
+                "order_filled":q-total_left,
+                "options":balance
             }
+            if q==total_left:
+                response = {
+                    "status":"error",
+                    "message":"unable to fulfill order at this time. Please try again later."
+                }
         except Exception as e:
             print(e)
             # remove order id
             if not ORDER_QUEUE.empty():
                 ORDER_QUEUE.get()
             db.session.rollback()
-            if added:
-                db.session.delete(order)
-                db.session.commit()
-                response['message'] = "Unable to add order."
+            # if added:
+                # db.session.delete(order)
+                # db.session.commit()
+                # response['message'] = "Unable to add order."
         
     return make_response(response)
 

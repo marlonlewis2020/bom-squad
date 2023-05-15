@@ -2,6 +2,8 @@
 # ID: 620001669
 
 from queue import PriorityQueue
+
+from sqlalchemy import desc
 from app import db
 from app.models import Order, Area, Truck, Address, Delivery, Compartments
 from datetime import datetime
@@ -110,7 +112,7 @@ class Graph:
                 self.AREAS[parish] = { "id":address_id, "trucks":[truck], "available_space":truck.available }
         
         if self.last:
-            self.available_trucks = db.session.query(Truck).filter(~Truck.id.in_(tuple(truck_ids))).filter_by(active=0).all()            
+            self.available_trucks = db.session.query(Truck).filter(~Truck.id.in_(tuple(truck_ids))).filter_by(active=1).all()            
         
         
     def discover( self, location ):
@@ -200,6 +202,7 @@ class Graph:
         qty -= truck.available
         # book truck/ fill truck
         truck.available = 0
+        truck.active = 1
         try:
             db.session.add(truck)
             # fill compartments
@@ -218,14 +221,14 @@ class Graph:
         return qty
         
     def fill_trucks(self, order, qty, address):
-        upgrade = (PriorityQueue())      
                 
         deliveries = db.session.query(Delivery.parish, Delivery.truck_id, Delivery.address_id).distinct().filter_by(date=self.delivery_date).all()
         truck_ids = [x[1] for x in deliveries]
         
-        self.available_trucks = db.session.query(Truck).filter(~Truck.id.in_(tuple(truck_ids))).filter_by(active=0).all()
+        self.available_trucks = db.session.query(Truck).filter(~Truck.id.in_(tuple(truck_ids))).filter_by(active=1).all()
         
         av_pq = PriorityQueue()
+        excess_comps = []
         for t in self.available_trucks:
             av_pq.put((-t.available, t))                
                 
@@ -241,15 +244,66 @@ class Graph:
                      
             # fill the order balance (qty) using the available booked trucks
             # if no available truck meets criteria then go through the booked trucks for available space 
-            result = self.find_best_fit(order, qty, address)
-            # if still no space is found, go through the compartments of the available trucks to best fill the order by occupying cominations of a single truck's compartments
+            result = list(self.find_best_fit(order, qty, address))
             if result[0] == 0:
                 return result[0], []
-        truck = result[1].get().id
-        truck_comps = db.session.query(Compartments.capacity).filter_by(truck_id=truck.id).filter_by(order_id=None).all()
+            
+            # if still no space is found, go through the compartments of the available trucks to best fill the order by occupying cominations of a single truck's compartments
+            if len(self.available_trucks):
+                # fill each
+                added = False
+                
+                for truck in self.available_trucks:
+                    
+                    try:
+                        
+                        # fill compartments
+                        comps = db.session.query(Compartments, Truck)\
+                        .filter(\
+                            (Truck.id==Compartments.truck_id)\
+                            & (Compartments.truck_id==truck.id)\
+                            & (Compartments.order_id==0)\
+                            & (Truck.active==1)).order_by(desc(Compartments.capacity)).all()
+                        
+                        # fill/update compartment from largest to smallest
+                        for comp in comps:
+                            if comp.Compartments.capacity <= qty:
+                                truck = comp.Truck
+                                comp.Compartments.order_id=order.id
+                                comp.Compartments.petrol = self.petrol
+                                # book truck/ fill truck
+                                comp.Truck.active = 1
+                                comp.Truck.available -= comp.Compartments.capacity
+                                
+                                # update the database (truck.available)
+                                db.session.add_all(comp)
+                                
+                                # update the qty
+                                qty -= comp.Compartments.capacity
+                                result[0] = qty
+                                # update delivery table
+                                delivery = Delivery(order.id, truck.id, address.id)
+                                db.session.add(delivery)
+                                db.session.commit()
+                            else:
+                                # update upgrade suggestions queue
+                                enqued = (abs(qty-comp.Truck.available), comp.Truck)
+                                result[1].put(enqued)
+                                
+                    except Exception as e:
+                        print(e)
+                        db.session.rollback()
+                        if added:
+                            db.session.delete_all(comp)
+                            db.session.commit()
+                
+        truck_comps = []
+        if not result[1].empty():
+            truck = result[1].get()[1]
+            truck_comps = db.session.query(Compartments.capacity).filter_by(truck_id=truck.id).filter_by(order_id=0).all()
         # store truck in global variable on server
         # lock truck in server for update
-        return result[0]
+        return result[0], [x[0] for x in truck_comps]
         
     
     def find_best_fit( self, order, qty, address ):
@@ -268,10 +322,11 @@ class Graph:
         area_trucks = self.AREAS[address.parish]['trucks']
         for truck in area_trucks:
             truck_pri = abs(qty - truck.available)
-            if qty >= truck.available: 
-                trucks_pq.put((truck_pri, truck))
-            else: 
-                trucks_pq_excess.put((truck_pri, truck))
+            if truck.available > 0:
+                if qty >= truck.available: 
+                    trucks_pq.put((truck_pri, truck))
+                else: 
+                    trucks_pq_excess.put((truck_pri, truck))
                 
         # mark this area as visited
         self.visited.append(address.parish)
@@ -288,19 +343,21 @@ class Graph:
                 nbr_trucks = self.AREAS[nbr]['trucks']
                 for truck in nbr_trucks:
                     truck_pri = abs(qty - truck.available)
-                    if qty >= truck.available: 
-                        trucks_pq.put((truck_pri, truck))
-                    else: 
-                        trucks_pq_excess.put((truck_pri, truck))
+                    if truck.available > 0:
+                        if qty >= truck.available: 
+                            trucks_pq.put((truck_pri, truck))
+                        else: 
+                            trucks_pq_excess.put((truck_pri, truck))
         
         # go through the trucks_pq to get the best fit while  
         while not trucks_pq.empty():
             diff, truck = trucks_pq.get()
             if diff >= 0:
-                qty = self.update_db(order, address, qty, truck)
+                if qty >= diff:
+                    qty = self.update_db(order, address, qty, truck)
                 if qty == 0: break
         
-        # return best fit upgrade recommendation queues                                  
+        # return best fit upgrade recommendation queues                                
         return qty, trucks_pq_excess
             
     def get_nbr_element(self, ele, nbr ):
