@@ -3,7 +3,7 @@ from MySQLdb import IntegrityError
 from app import app, db
 from flask import Flask, url_for, redirect, request, session, make_response
 from .models import Customer, User, Address, Order, Delivery, Area, Truck, Compartments
-from .forms import CustomerForm, AddressForm, OrderForm, UserForm
+from .forms import CustomerForm, AddressForm, OrderForm, UserForm, TruckForm
 from werkzeug.security import generate_password_hash
 from app.utils.utils import strtodate, sql_date
 from queue import PriorityQueue, Queue
@@ -251,20 +251,29 @@ def order(id):
             status: "success"
         }
         '''
-        form = OrderForm()
-        order=db.session.query(Order).filter_by(id=id).scalar()
-        order.delivery_date = form.delivery_date.data
-        order.last_updated = datetime.utcnow()
-        order.delivery_time = form.delivery_time.data
-        order.quantity = form.quantity.data
-        order.q_diesel = form.q_diesel.data
-        order.q_87 = form.q_87.data
-        order.q_90 = form.q_90.data
-        order.q_ulsd = form.q_ulsd.data
-        order.price = form.price.data
-        order.status = "Pending"
-        # update order object
-        db.session.commit()
+        try:
+                
+            form = OrderForm()
+            order=db.session.query(Order).filter_by(id=id).first()
+            order.delivery_date = strtodate(form.delivery_date.data)
+            order.last_updated = datetime.utcnow()
+            order.delivery_time = form.delivery_time.data
+            order.quantity = form.quantity.data
+            order.q_diesel = form.q_diesel.data
+            order.q_87 = form.q_87.data
+            order.q_90 = form.q_90.data
+            order.q_ulsd = form.q_ulsd.data
+            order.price = form.price.data
+            order.status = "Pending"
+            # update order object
+            db.session.commit()
+        except Exception as e:
+            print(e)
+            db.session.rollback()
+            response = {
+                "status":"error",
+                "message":"unable to update order"
+            }
         response = {
             "status": "success"
         }
@@ -542,7 +551,31 @@ def trucks():
             status: ""success"",
         }
         '''
-        pass
+        response = {
+            "status":"error",
+            "message":"unable to add new truck."
+        }
+        try:
+            form = TruckForm()
+            truck = Truck(form.license_plate.data, form.capacity.data, form.make.data, form.model.data, form.year.data, form.active.data)
+            db.session.add(truck)
+            db.session.commit()
+            db.session.refresh(truck)
+            
+            cap = [int(x) for x in form.capacity.data.split(",")]
+            for i, capacity in enumerate(cap):
+                compartment_no = i+1
+                comp = Compartments(truck.id, compartment_no, capacity)
+                db.session.add(comp)
+            db.session.commit()
+            response = {
+                "status":"success"
+            }
+        except Exception as e:
+            print(e)
+            db.session.rollback()
+            
+        return make_response(response)
     return make_response(IN_PROGRESS)
     
     

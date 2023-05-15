@@ -157,6 +157,17 @@ class Truck(db.Model):
     model = db.Column(db.String(50), nullable=False)
     year = db.Column(db.Integer, nullable=False)
     active = db.Column(db.Boolean, default=0)
+    
+    def __init__(self, license_plate, capacity, make, model, year, active=1):
+        self.license_plate = license_plate
+        cap = [int(x) for x in capacity.split(",")]
+        total = sum(cap)
+        self.capacity = total
+        self.available = total
+        self.make = make
+        self.model = model
+        self.year = year
+        self.active = active
 
 class Delivery(db.Model):
     __tablename__="delivery"
@@ -187,9 +198,9 @@ class Compartments(db.Model):
     capacity = db.Column(db.Integer, nullable=False)
     petrol = db.Column(db.String(5), default="")
     
-    def __init__(self, truck_id, order_id, compartment_no, capacity):
+    def __init__(self, truck_id, compartment_no, capacity):
         self.truck_id = truck_id
-        self.order_id = order_id
+        self.order_id = 0
         self.compartment_no = compartment_no
         self.capacity = capacity
         

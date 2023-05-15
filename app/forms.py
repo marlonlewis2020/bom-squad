@@ -1,7 +1,7 @@
 from app import db
 from datetime import date
 from flask_wtf import FlaskForm
-from wtforms import StringField, EmailField, TelField, IntegerField, DateField, DateTimeField, DecimalField, PasswordField
+from wtforms import StringField, EmailField, TelField, IntegerField, DateField, DateTimeField, DecimalField, PasswordField, BooleanField
 from wtforms.validators import InputRequired, Length
 
 class CustomerForm(FlaskForm):
@@ -44,3 +44,13 @@ class AddressForm(FlaskForm):
     parish = StringField("Parish", validators=[InputRequired()])
     country = StringField("Country", validators=[InputRequired()])
     postal_code = StringField("Area Code")
+    
+class TruckForm(FlaskForm):    
+    license_plate =  StringField("License Plate", validators=[InputRequired(), Length(max=20)])
+    capacity = StringField("Capacity", validators=[InputRequired()])
+    available = IntegerField("Available", validators=[InputRequired()])
+    make = StringField("Make", validators=[InputRequired(), Length(max=50)])
+    model = StringField("Model", validators=[InputRequired(), Length(max=50)])
+    year = IntegerField("Capacity", validators=[InputRequired()])
+    active = BooleanField("Active", validators=[InputRequired()])
+    
