@@ -125,12 +125,12 @@ def customer(id):
             address = "{} {}, {}, {}, {}".format(location.address_line_1, location.city, location.parish, location.country, location.postal_code)
             response = {
                 'data':{
-                    'customerID':customer.id,
+                    'customer_id':customer.id,
                     'company':customer.company,
                     'branch':customer.branch,
-                    'phoneNumber':customer.contact_number,
+                    'contact_number':customer.contact_number,
                     'email':customer.email,
-                    'purchasingOfficer':customer.officer,
+                    'officer':customer.officer,
                     'location':address,
                     'address_id':location.id
                     }
@@ -452,13 +452,14 @@ def orders():
             cid = int(form.customer_id.data)
             d_date = form.delivery_date.data.strip()
             d_time = form.delivery_time.data.strip()
-            q = int(form.quantity.data)
             qd = int(form.q_diesel.data)
             q87 = int(form.q_87.data)
             q90 = int(form.q_90.data)
             qul = int(form.q_ulsd.data)
+            q = qd+q87+q90+qul          
             price = float(form.price.data)
             status = form.status.data
+            d_date = format_date(datetime(*[int(x) for x in d_date.split("-")]))
             order = Order(None, cid, d_date, d_time, q, qd, q87, q90, qul, price, status)
             db.session.add(order)
             db.session.commit()
