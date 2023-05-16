@@ -153,20 +153,13 @@ class Address(db.Model):
     country = db.Column(db.String(30), default="Jamaica", nullable=False)
     postal_code = db.Column(db.String(10), default="JMAKN03", nullable=False)
     
+    
     def __init__(self, address_line_1, city, parish, country="Jamaica", postal_code="JMAKN03"):
         self.address_line_1 = address_line_1
         self.city = city
         self.parish = parish
         self.country = country
         self.postal_code = postal_code
-        print("Address object created")
-    
-    def __init__(self, address_line_1, city, parish, country="Jamaica"):
-        self.address_line_1 = address_line_1
-        self.city = city
-        self.parish = parish
-        self.country = country
-        self.postal_code = "JMAKN03"
         print("Address object created")
 
 class Truck(db.Model):

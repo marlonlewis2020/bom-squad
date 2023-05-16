@@ -16,6 +16,12 @@ class CustomerForm(FlaskForm):
     username = StringField("Username", validators=[InputRequired()])
     password = PasswordField("Password", validators=[InputRequired()])
     location = StringField("Address Line 1", validators=[InputRequired(), Length(max=120)])
+    
+    address_line_1 = StringField("Address Line 1", validators=[InputRequired()])
+    city = StringField("City")
+    parish = StringField("Parish", validators=[InputRequired()])
+    country = StringField("Country", validators=[InputRequired()])
+    postal_code = StringField("Area Code")
 
 class UserForm(FlaskForm):
     name = StringField("Name", validators=[InputRequired(), Length(min=3, max=50)])
