@@ -131,7 +131,8 @@ def customer(id):
                     'phoneNumber':customer.contact_number,
                     'email':customer.email,
                     'purchasingOfficer':customer.officer,
-                    'location':address
+                    'location':address,
+                    'address_id':location.id
                     }
             }
             response['status'] = 'success',
@@ -197,13 +198,22 @@ def customers():
             }
         form = CustomerForm()
         
-        address = form.location.data.split(",")
-        if len(address)==3:
-            address = Address(address[0].strip(), address[1].strip(), address[2].strip())
-        elif len(address)==4:
-            address = Address(address[0].strip(), address[1].strip(), address[2].strip(), address[3].strip())
-        elif len(address)==5:
-            address = Address(address[0].strip(), address[1].strip(), address[2].strip(), address[3].strip(), address[4].strip())
+        address = "{},{},{},{},{}".format(form.address_line_1.data.strip(), form.city.data.strip(), form.parish.data.strip(), form.country.data.strip(), form.postal_code.data.strip())
+        address=address.split(",")
+        
+        # address = Address()
+        # address.address_line_1 = form.address_line_1.data.strip()
+        # address.city = form.city.data.strip()
+        # address.parish = form.parish.data.strip()
+        # address.country = form.country.data.strip()
+        # address.postal_code = form.postal_code.data.strip()
+        address = Address(address[0].strip(), address[1].strip(), address[2].strip(), address[3].strip(), address[4].strip())
+        # if len(address)==3:
+        #     address = Address(address[0].strip(), address[1].strip(), address[2].strip())
+        # elif len(address)==4:
+        #     address = Address(address[0].strip(), address[1].strip(), address[2].strip(), address[3].strip())
+        # elif len(address)==5:
+        #     address = Address(address[0].strip(), address[1].strip(), address[2].strip(), address[3].strip(), address[4].strip())
             
         user = User(form.name.data or "{} {}".format(form.company.data.trim(), form.branch.data.trim()), form.contact_number.data, form.email.data, form.role.data, form.username.data, generate_password_hash(form.password.data))
         address_added = False
