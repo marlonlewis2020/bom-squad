@@ -89,7 +89,7 @@ def generate_token():
 @app.route('/api/v1/customers/<id>', methods=['GET','PUT'])
 # @login_required
 def customer(id):
-    """ Gets a customer's details """
+    """ Gets or updates a customer's details """
     # get customer or updates customer by id
     if request.method == 'GET':
         # GET THE ORDER DETAILS
@@ -157,7 +157,7 @@ def customer(id):
             cus.contact_number = form.contact_number.data
             cus.email = form.email.data
             cus.role = form.role.data
-            cus.username = form.username.data
+            # cus.username = form.username.data
             cus.password = generate_password_hash(form.password.data)
             db.session.commit()
             response = {
