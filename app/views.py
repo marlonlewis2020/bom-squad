@@ -900,6 +900,7 @@ def get_booked_trucks():
 # USERS END POINTS 
 
 @app.route('/api/v1/users', methods=['GET'])
+# @login_required
 def users():
     response = {
         "status":"error"

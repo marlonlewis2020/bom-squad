@@ -28,13 +28,11 @@ class User(db.Model):
         
     def repr(self):
         return {
-            "id":self.id,
             "name":self.name,
             "contact_number":self.contact_number,
             "email":self.email,
             "role":self.role,
             "username":self.username,
-            "password":self.password,
             "is_active":self.is_active
         }
         
