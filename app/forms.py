@@ -24,6 +24,12 @@ class UserForm(FlaskForm):
     role = StringField("Role", validators=[InputRequired(), Length(min=3, max=30)])
     username = StringField("Username", validators=[InputRequired()])
     password = PasswordField("Password", validators=[InputRequired()])
+    
+
+class LoginForm (FlaskForm):
+    username = StringField('Username', validators=[InputRequired(), Length(min=2, max=80)])
+    password = PasswordField('Password', validators=[InputRequired(), Length(min=2, max=80)])
+    
 
 class OrderForm(FlaskForm):
     customer_id = IntegerField("Customer Id", validators=[InputRequired()])
@@ -37,6 +43,7 @@ class OrderForm(FlaskForm):
     price = DecimalField("Price")
     status = StringField("Status")
     location = IntegerField("Address Id", validators=[InputRequired()])
+    preferred = StringField("Preferred Petrol")
     
 class AddressForm(FlaskForm):
     address_line_1 = StringField("Address Line 1", validators=[InputRequired()])

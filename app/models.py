@@ -1,6 +1,7 @@
 from . import db
 from datetime import datetime
 from app.utils.utils import format_date, strtodate
+from flask_login import current_user
 
 user_id = 'user.id'
 
@@ -13,6 +14,7 @@ class User(db.Model):
     role = db.Column(db.String(20), nullable=False)
     username = db.Column(db.String(20), unique=True, nullable=False)
     password = db.Column(db.String(256), nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
     
     def __init__(self, name, contact_number, email, role, username, password):
         self.name = name
@@ -21,7 +23,16 @@ class User(db.Model):
         self.role = role
         self.username = username
         self.password = password
+        self.is_active = True
         print("User object created")
+        
+    def get_id(self):
+        return self.id
+    
+    def is_authenticated(self):
+        if current_user.id is not None:
+            return True
+        return False
 
     # __mapper_args__ = {
     #     'polymorphic_identity': 'user',
@@ -119,7 +130,8 @@ class Order(db.Model):
             "customerName":customer_name,
             "address":customer_address,
             "deliveryDate":self.delivery_date,
-            "deliveryTime":self.delivery_time
+            "deliveryTime":self.delivery_time,
+            "status":self.status
         }    
 
 class Address(db.Model):
@@ -168,6 +180,18 @@ class Truck(db.Model):
         self.model = model
         self.year = year
         self.active = active
+        
+    def repr(self):
+        return {
+            "id":self.id,
+            "license_plate":self.license_plate,
+            "capacity":self.capacity,
+            "available":self.available,
+            "make":self.make,
+            "model":self.model,
+            "year":self.year,
+            "active":self.active
+        }
 
 class Delivery(db.Model):
     __tablename__="delivery"
@@ -196,7 +220,7 @@ class Compartments(db.Model):
     order_id = db.Column(db.Integer, default=0)
     compartment_no = db.Column(db.Integer, nullable=False)
     capacity = db.Column(db.Integer, nullable=False)
-    petrol = db.Column(db.String(5), default="")
+    petrol = db.Column(db.String(6), default="")
     
     def __init__(self, truck_id, compartment_no, capacity):
         self.truck_id = truck_id
