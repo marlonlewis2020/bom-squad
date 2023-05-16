@@ -18,7 +18,7 @@ class Graph:
         """Graph Constructor
         """
         self.petrol = petrol
-        self.last = last
+        # self.last = last
         self.DEPTH = {}
         self.discovered = {}
         self.adjacency_list = {}
@@ -36,7 +36,6 @@ class Graph:
         self.start_node = start_node
         self.visited = []
         self.areas_in_depth = list() # list for: areas in which to look for booked trucks with space to fill other order balances
-        self.excess = list()
         self.delivery_date = date
         self.delivery_time = time
         self.load_area_nodes()
@@ -64,7 +63,6 @@ class Graph:
         self.load_area_nodes()
         self.visited = []
         self.areas_in_depth = list()
-        self.excess = list()
         
     def load_area_nodes(self):
         """Load up the graph data structure - contains areas and the trucks booked for each area"""
@@ -113,8 +111,8 @@ class Graph:
             else: 
                 self.AREAS[parish] = { "id":address_id, "trucks":[truck], "available_space":truck.available }
         
-        if self.last:
-            self.set_available_trucks(truck_ids)            
+        # if self.last:
+        #     self.set_available_trucks(truck_ids)            
         
     def set_available_trucks(self, truck_ids):
         self.available_trucks = db.session.query(Truck).filter(~Truck.id.in_(tuple(truck_ids))).filter((Truck.active==1) & (Truck.available>0)).all()
@@ -154,7 +152,8 @@ class Graph:
                         if wt is not self.INF:
                             # Get total weight (wt) from area to each neighbour
                             nbr_sum = available + wt
-                        
+                            while nbr_sum in [x[0] for x in self.booked_areas.queue]:
+                                nbr_sum += 1
                             self.booked_areas.put((nbr_sum, nbr))
                             
                             # if value from area to a nbr is less than what is already in discovered, and neighbour not yet visited
@@ -240,7 +239,10 @@ class Graph:
         av_pq = PriorityQueue()
         # excess_comps = []
         for t in self.available_trucks:
-            av_pq.put((-t.available, t))                
+            p = -t.available
+            while p in (x[0] for x in av_pq.queue):
+                p += 1
+            av_pq.put((p, t))                
                 
         if qty > 0:
             while not av_pq.empty():
@@ -288,17 +290,20 @@ class Graph:
                                 comp.Truck.available -= comp.Compartments.capacity
                                 
                                 # update the database (truck.available)
-                                db.session.add_all(comp)
+                                # db.session.add_all(comp)
                                 
                                 # update the qty
                                 qty -= comp.Compartments.capacity
                                 result[0] = qty
                                 
-                                db.session.commit()
+                                # db.session.commit()
                                 
                             else:
                                 # update upgrade suggestions queue
-                                enqued = (abs(qty-comp.Truck.available), comp.Truck)
+                                p = abs(qty-comp.Truck.available)
+                                while p in [x[0] for x in result[1].queue]:
+                                    p += 1
+                                enqued = (p, comp.Truck)
                                 result[1].put(enqued)
                                 
                         # update delivery table
@@ -313,13 +318,12 @@ class Graph:
                         qty = prev_qty
                         if added:
                             db.session.delete(delivery)
-                            db.session.delete(comp.Truck)
-                            db.session.delete(comp.Compartments)
                             db.session.commit()
                 
         truck_comps = []
         if not result[1].empty():
             truck = result[1].get()[1]
+            self.upgrade_truck = truck.id
             truck_comps = db.session.query(Compartments.capacity).filter_by(truck_id=truck.id).filter_by(order_id=0).all()
         # store truck in global variable on server
         # lock truck in server for update
@@ -344,8 +348,12 @@ class Graph:
             truck_pri = abs(qty - truck.available)
             if truck.available > 0:
                 if qty >= truck.available: 
+                    while truck_pri in [x[0] for x in trucks_pq.queue]:
+                        truck_pri += 1
                     trucks_pq.put((truck_pri, truck))
                 else: 
+                    while truck_pri in [x[0] for x in trucks_pq_excess.queue]:
+                        truck_pri += 1
                     trucks_pq_excess.put((truck_pri, truck))
                 
         # mark this area as visited
@@ -365,8 +373,12 @@ class Graph:
                     truck_pri = abs(qty - truck.available)
                     if truck.available > 0:
                         if qty >= truck.available: 
+                            while truck_pri in [x[0] for x in trucks_pq.queue]:
+                                truck_pri += 1
                             trucks_pq.put((truck_pri, truck))
                         else: 
+                            while truck_pri in [x[0] for x in trucks_pq_excess.queue]:
+                                truck_pri += 1
                             trucks_pq_excess.put((truck_pri, truck))
         
         # go through the trucks_pq to get the best fit while  
