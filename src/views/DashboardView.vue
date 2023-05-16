@@ -56,10 +56,10 @@
       })
       .then((data)=>{
           if (data.status == "success") {
-            console.log("post added successfully");
+            console.log("order created successfully");
             location.reload();
           } else {
-              console.log("failed to add post");
+              console.log("failed to create order");
           }
       });
     }
