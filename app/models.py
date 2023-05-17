@@ -44,10 +44,6 @@ class User(db.Model):
             return True
         return False
 
-    # __mapper_args__ = {
-    #     'polymorphic_identity': 'user',
-    #     'polymorphic_on': role
-    # }
 
 class Customer(User):
     __tablename__ = 'customer'
@@ -66,9 +62,6 @@ class Customer(User):
         self.officer = officer
         print("Customer object created")
 
-    # __mapper_args__ = {
-    #     'polymorphic_identity': 'customer',
-    # }
 
 class Driver(User):
     __tablename__ = 'driver'
@@ -77,17 +70,22 @@ class Driver(User):
     truck_id = db.Column(db.Integer, db.ForeignKey('truck.id'), nullable=False)
     status = db.Column(db.String(20), nullable=False)
 
-    # __mapper_args__ = {
-    #     'polymorphic_identity': 'driver',
-    # }
+    def __init__(self, license_number, truck_id, status, user):
+        super().__init__(user.name, user.contact_number, user.email, user.role, user.username, user.password)
+        self.license_number = license_number
+        self.truck_id = truck_id
+        self.status = status
+        print("Driver object created")
 
 class Admin(User):
     __tablename__ = 'admin'
     id = db.Column(db.Integer, db.ForeignKey(user_id), primary_key=True)
+    group = db.Column(db.String(20), default="dispatcher")
+    
+    def __init__(self, group, user):
+        super().__init__(user.name, user.contact_number, user.email, user.role, user.username, user.password)
+        self.group = group
 
-    # __mapper_args__ = {
-    #     'polymorphic_identity': 'admin',
-    # }
 
 class Order(db.Model):
     __tablename__="order"
@@ -167,7 +165,6 @@ class Truck(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     license_plate = db.Column(db.String(20), nullable=False, unique=True)
     capacity = db.Column(db.Integer, nullable=False)
-    available = db.Column(db.Integer, nullable=False)
     make = db.Column(db.String(50), nullable=False)
     model = db.Column(db.String(50), nullable=False)
     year = db.Column(db.Integer, nullable=False)
@@ -197,37 +194,111 @@ class Truck(db.Model):
         }
 
 class Delivery(db.Model):
+    """ An order can be delivered by multiple trucks. 
+        This is the dispatching of a specific truck, at a specific date/time.
+        This sets the delivery assignment for a specific truck. 
+        This delivery is tied to a specific date/time.
+    """
     __tablename__="delivery"
-    id = db.Column(db.Integer, primary_key=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
-    truck_id = db.Column(db.Integer, db.ForeignKey('truck.id'), nullable=False)
-    address_id = db.Column(db.Integer, db.ForeignKey('address.id'), nullable=False)
-    parish = db.Column(db.String(20), nullable=False)
+    id = db.Column(db.Integer, primary_key=True) # specific to this truck on this date and time for this 1 full trip
+    truck_id = db.Column(db.Integer, db.ForeignKey('truck.id'), nullable=False) # specific truck
+    parish = db.Column(db.String(20), nullable=False) # this
     date = db.Column(db.String(25), nullable=False)
     time = db.Column(db.String(20), nullable=False)
+    filled = db.Column(db.Integer, nullable=False)
+    available = db.Column(db.Integer, nullable=False)
     
-    def __init__(self, order_id, truck_id, address_id):
-        self.order_id = order_id
+    def __init__(self, date, time, truck_id, parish, qty):
         self.truck_id = truck_id
-        self.address_id = address_id
-        address = db.session.query(Address).filter_by(id=address_id).first()
-        self.parish = address.parish
-        order = db.session.query(Order).filter_by(id=order_id).first()
-        self.date = format_date(order.delivery_date)
-        self.time = order.delivery_time
+        self.parish = parish
+        self.date = date
+        self.time = time
+        self.filled = qty
+        
+    def get_compartment_info(self):
+        # use delivery id to get all filled compartments from DeliveryCompartments
+        response = []
+        result = db.session.query(DeliveryCompartments).join(Compartments, DeliveryCompartments.compartment_id==Compartments.id)\
+        .add_columns(Compartments.order_id, DeliveryCompartments.compartment_no).filter(DeliveryCompartments.delivery_id==self.id).all()
+        
+        if result:
+            response = [{
+                "compartment_no":x[2],
+                "order_no":x[1],
+            } for x in result]
+        return response
+    
+    def get_orders(self):
+        """         
+        gets all the orders or stops to make during this specific delivery trip.
+        The orders/stops are determined by the filled compartments for this truck's delivery trip.
+        This delivery is tied to a specific date/time.
+        """        
+        orders = []
+        order_nos = [x[0] for x in db.session.query(DeliveryCompartments.order_no).distinct().filter_by(delivery_id=self.id).all()]
+        for id in order_nos:
+            try:
+                customer = db.session.query(Address, Customer, User, Order)\
+                    .filter(
+                        (Address.id==Customer.address_id)\
+                        & (Customer.id==User.id)\
+                        & (User.id==Order.customer_id)\
+                        & (Order.id==id)).first()
+                
+                address = "{0} {1}, {2}, {3}, {4}".format(customer.Address.address_line_1, customer.Address.city, customer.Address.parish, customer.Address.country, customer.Address.postal_code)
+                orders.append( Order.to_json( customer.Order, customer.User.name, address ))           
+            except Exception as e:
+                print(e)     
+        return orders
+        
+class DeliveryCompartments(db.Model):
+    """ A single delivery for a truck can span multiple compartments for one or more orders. 
+    Hence compartments must indicate petrol type and order number. 
+    As delivery is for a specific trip (truck, date and time) - this is also an assignment of compartments for a specific trip.
+    However, this assignment is one that forms a compartment/order set for a specific order on the specific trip. """
+    id = db.Column(db.Integer, primary_key=True)
+    delivery_id = db.Column(db.Integer, db.ForeignKey('delivery.id'), nullable=False) # associated with a single truck
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False) # could be associated with multiple trucks
+    compartment_id = db.Column(db.Integer, db.ForeignKey('compartments.id'), nullable=False)
+    petrol = db.Column(db.String(6), nullable=False)
+    qty = db.Column(db.Integer, nullable=False)
+    
+    def __init__(self, delivery_id, order_id, compartment_id, petrol, qty):
+        self.qty = qty
+        delivery = db.session.query(Delivery).filter_by(id=self.delivery_id).first()
+        comp = db.session.query(Compartments.capacity).filter_by(id=compartment_id).first()[0]
+        self.delivery_id = delivery_id
+        self.compartment_id = compartment_id
+        self.petrol = petrol
+        # assign order id to this compartment
+        self.order_id = order_id
+        # update delivery available balance
+        delivery.filled += comp
+            
+    def __is_valid(self):
+        comp = db.session.query(Compartments.capacity).filter_by(id=self.compartment_id).first()[0]
+        return self.qty >= comp
+    
+    def save(self):
+        if self.__is_valid():
+            try:
+                db.session.add(self)
+                db.session.commit()
+                return True
+            except Exception as e:
+                print(e)
+        return False
+            
         
 class Compartments(db.Model):
     __tablename__="compartments"
     id = db.Column(db.Integer, primary_key=True)
     truck_id = db.Column(db.Integer, db.ForeignKey('truck.id'), nullable=False)
-    order_id = db.Column(db.Integer, default=0)
     compartment_no = db.Column(db.Integer, nullable=False)
     capacity = db.Column(db.Integer, nullable=False)
-    petrol = db.Column(db.String(6), default="")
     
     def __init__(self, truck_id, compartment_no, capacity):
         self.truck_id = truck_id
-        self.order_id = 0
         self.compartment_no = compartment_no
         self.capacity = capacity
         
