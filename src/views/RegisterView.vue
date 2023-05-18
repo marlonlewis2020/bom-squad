@@ -5,5 +5,5 @@
 </template>
 
 <script setup lang="ts">
-    import PlaceOrder from '../components/TheRegister.vue'
+    import TheRegister from '../components/TheRegister.vue'
 </script>

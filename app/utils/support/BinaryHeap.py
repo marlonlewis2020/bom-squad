@@ -1,6 +1,7 @@
 import math
 
 
+
 class BinaryHeap:
     NIL = 0
     last_inserted_index = 1
@@ -10,10 +11,13 @@ class BinaryHeap:
         # sets initial to the number of data inserted in structure to 0
         # sets initial scaling factor to increase by to 2
         # sets initial empty cell vlaues to NIL to be later updated
-        self.v = [0,2,self.NIL]
+        self.v = [0,2,(self.NIL)]
         # FYI, example data structure with one node inserted: [1, 3, el, NIL, NIL]
 
     # PREDICATES
+    
+    def empty(self):
+        return self.v[0] == 0
     
     def in_list(self, index_pos):
         return index_pos <= self.last_inserted_index and index_pos >= 2
@@ -23,8 +27,10 @@ class BinaryHeap:
             MAX HEAP CHECK/CORRECTION CRITERIA: child > parent
             MIN HEAP CHECK/CORRECTION CRITERIA: child < parent
         '''
-        return child > parent
+        return self.get_pri(child) < self.get_pri(parent)
     
+    def get_pri(self, el):
+        return el[0]
     
     # ACCESSORS
     
@@ -57,21 +63,25 @@ class BinaryHeap:
     
     def pop(self):
         # pop/get the root node
-        node = self.v[self.root_index]
-        if self.size()>0:
-            # copy the last node to the root
-            self.v[self.root_index] = self.v[self.last_inserted_index]
-            # replace/set the original position of the copied node with NIL
-            self.v[self.last_inserted_index] = self.NIL
-            # update the index for the last inserted node
-            self.v[0] -= 1
-            self.last_inserted_index -= 1
-            # initiate the bubble_down method to organize the heap in order
-            self.bubble_down(self.root_index) 
-            # return the popped node
-        return node
+        if not self.empty():
+            node = self.v[self.root_index]
+            if self.size()>0:
+                # copy the last node to the root
+                self.v[self.root_index] = self.v[self.last_inserted_index]
+                # replace/set the original position of the copied node with NIL
+                self.v[self.last_inserted_index] = self.NIL
+                # update the index for the last inserted node
+                self.v[0] -= 1
+                self.last_inserted_index -= 1
+                # initiate the bubble_down method to organize the heap in order
+                self.bubble_down(self.root_index) 
+                # return the popped node
+            return node[1]
+        return None
     
     # SUPPORT
+    def get(self):
+        pass
     
     def bubble_up(self, next_insert_index_posn):
         if next_insert_index_posn > 2:
@@ -86,7 +96,7 @@ class BinaryHeap:
         left_index = self.left(parent_index)
         right_index = self.right(parent_index)
         if self.in_list(left_index) and self.in_list(right_index):
-            choice = (right_index,left_index)[self.v[left_index]>self.v[right_index]]
+            choice = self.get_smaller_node(right_index,left_index) # returns the index of the smaller node
             if self.order_violated(self.v[choice], self.v[parent_index]):
                 self.swap(choice,parent_index)
                 self.bubble_down(choice)
@@ -98,6 +108,8 @@ class BinaryHeap:
             self.swap(right_index,parent_index)
             self.bubble_down(right_index)
     
+    def get_smaller_node(self, left, right):
+        return (right,left)[self.get_pri(self.v[left]) < self.get_pri(self.v[right])]
     
     def nexy_array(self):
         # creates a new array larger than the current array
