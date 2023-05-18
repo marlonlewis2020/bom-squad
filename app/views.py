@@ -1,13 +1,17 @@
 from datetime import datetime, timedelta
+import MySQLdb
 from flask_login import current_user, login_user, logout_user, login_required
 from app import app, db, LOCKED, PEND, login_manager
 from flask import Flask, jsonify, request, session, make_response
-from .models import Customer, User, Address, Order, Delivery, Area, Truck, Compartments
+
+from app.utils.support.BinaryHeap import BinaryHeap
+from .models import Customer, User, Address, Order, Delivery, Area, Truck, Compartment, DeliveryCompartment
 from .forms import CustomerForm, AddressForm, OrderForm, UserForm, TruckForm, LoginForm
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.utils.utils import format_date, sql_date, strtodate
 from queue import Queue
-from app.utils.support.Graph import Graph
+# from app.utils.support.Graph import Graph
+from app.utils.support.G import Graph
 import jwt
 
 ACTIVE = {}
@@ -198,7 +202,11 @@ def customers():
             }
         form = CustomerForm()
         
-        address = "{},{},{},{},{}".format(form.address_line_1.data.strip(), form.city.data.strip(), form.parish.data.strip(), form.country.data.strip(), form.postal_code.data.strip())
+        if form.location.data:
+            address = form.location.data
+        else:
+            address = "{},{},{},{},{}".format(form.address_line_1.data.strip(), form.city.data.strip(), form.parish.data.strip(), form.country.data.strip(), form.postal_code.data.strip())
+            
         address=address.split(",")
         
         # address = Address()
@@ -450,7 +458,7 @@ def orders():
         # use best fit to fill the 
         try:
             cid = int(form.customer_id.data)
-            d_date = form.delivery_date.data.strip()
+            d_d = form.delivery_date.data.strip()
             d_time = form.delivery_time.data.strip()
             qd = int(form.q_diesel.data)
             q87 = int(form.q_87.data)
@@ -459,8 +467,12 @@ def orders():
             q = qd+q87+q90+qul          
             price = float(form.price.data)
             status = form.status.data
-            d_date = format_date(datetime(*[int(x) for x in d_date.split("-")]))
-            order = Order(None, cid, d_date, d_time, q, qd, q87, q90, qul, price, status)
+            d_date = ""
+            if len(d_d.split("-"))==3:
+                d_date = format_date(datetime(*[int(x) for x in d_d.split("-")]))
+            else:
+                d_date = d_d[0]
+            order = Order(None, cid, d_date, d_time, 0, 0, 0, 0, 0, price, status)
             db.session.add(order)
             db.session.commit()
             db.session.refresh(order)
@@ -475,10 +487,10 @@ def orders():
             
             """ Perform critical operations """
             address = db.session.query(Address).filter_by(id=int(form.location.data)).first()
-            q_diesel_order = Graph(address.parish, "diesel", qd, d_date, d_time, 10)
-            q_87_order = Graph(address.parish, "87", q87, d_date, d_time, 10)
-            q_90_order = Graph(address.parish, "90", q90, d_date, d_time, 10)
-            q_ulsd_order = Graph(address.parish, "ulsd", qul, d_date, d_time, 10)
+            q_diesel_order = Graph(order.id, address.parish, "diesel", qd, d_date, d_time, 10)
+            q_87_order = Graph(order.id, address.parish, "87", q87, d_date, d_time, 10)
+            q_90_order = Graph(order.id, address.parish, "90", q90, d_date, d_time, 10)
+            q_ulsd_order = Graph(order.id, address.parish, "ulsd", qul, d_date, d_time, 10)
             total_order = {
                 "q_diesel_order" : q_diesel_order,
                 "q_87_order" : q_87_order,
@@ -486,16 +498,25 @@ def orders():
                 "q_ulsd_order" : q_ulsd_order
             }
             
+            preferred = f"q_{form.preferred.data}_order"
+            prioritized_order = BinaryHeap()
             i_orders = total_order.keys()
             total_left = 0
             for gas in i_orders:
-                fill_order = total_order[gas]
-                if fill_order.QTY > 0:
-                    result = fill_order.fill_trucks(order, fill_order.QTY, address)
+                sub_order = total_order[gas]
+                if gas == preferred:
+                    prioritized_order.heap_insert((0, sub_order))
+                else:
+                    prioritized_order.heap_insert((1, sub_order))
+                    
+            while not prioritized_order.empty():
+                sub_order = prioritized_order.pop()
+                if sub_order.QTY > 0:
+                    result = sub_order.fill_trucks()
                     total_left += result[0]
                     balance[gas]={
-                        "ordered":fill_order.QTY,
-                        "filled":fill_order.QTY-result[0],
+                        "ordered":sub_order.O_QTY,
+                        "filled":sub_order.O_QTY-result[0],
                     }
                     
                     if str(gas.split("_")[1]).strip() == form.preferred.data.strip():
@@ -523,22 +544,28 @@ def orders():
                 # order cannot be filled. No trucks are available for the date
                 db.session.delete(order)
                 db.session.commit()
-                response = {
-                    "status":"error",
-                    "message":"unable to fulfill order at this time. Please try a different date."
-                }
+                response["status"] = "error"
+                response["message"] = "unable to fulfill order at this time. Please try a different date."
             else:
                 for gas in i_orders:
                     fill_order = total_order[gas]
                     if str(form.preferred.data).strip().casefold() == str(gas.split("_")[1]).casefold().strip():
-                        if fill_order.upgrade_truck:
-                            lock_truck(order.id, fill_order.upgrade_truck, gas)
+                        if not fill_order.upgrade_pq.empty():
+                            ug = fill_order.upgrade_pq.pop()
+                            lock_truck(order.id, ug, gas)
+        except MySQLdb.OperationalError as ope:
+            print(ope)
+        
         except Exception as e:
             print(e)
             # remove order id
             if not ORDER_QUEUE.empty():
                 ORDER_QUEUE.get()
             db.session.rollback()
+            db.session.delete(order)
+            response = {
+                "status":"error"
+            }
             response['message'] = "Unable to add order."
             # if added:
                 # db.session.delete(order)
@@ -566,32 +593,30 @@ def confirm_order(id):
                     for i, gas in enumerate(gases):
                         # get amount to upgrade this gas type by from the response and update the compartment
                         amount = int(request.form.get(gas.split("_order")[0]))
-                        if amount > 0:
+                        comps = truck.available_compartments()
                         
-                            # get the compartment where the cap is equal to the amount
-                            comp = db.session.query(Compartments).filter(
-                                (Compartments.truck_id==truck_id) 
-                                & (Compartments.capacity==amount)).first()
-                            
-                            # update each gas type quantity in the order
-                            match i:
-                                case 0:
-                                    order.Order.q_diesel += amount
-                                case 1:
-                                    order.Order.q_87 += amount
-                                case 2:
-                                    order.Order.q_90 += amount
-                                case 3:
-                                    order.Order.q_ulsd += amount
-                            truck.available -= amount
-                            # update the compartment where the cap is equal to the amount
-                            comp.petrol=gas.split("_")[1]
-                            comp.order_id=order.Order.id
-                            # add the amount to the overall balance
-                            order.Order.quantity += amount
+                        for comp in comps:
+                            # fill all compartments of this truck
+                            if comp.capacity == amount:
+                                delivery = db.session.query(DeliveryCompartment).filter_by(truck_id=truck_id).first()
+                                comp = DeliveryCompartment( delivery.id, id, comp.id, truck_id, gas, comp.capacity)
+                                db.session.add(comp)
+                        match gas:
+                            # update the specific fuel type quantity
+                            case "diesel":
+                                order.q_diesel += amount
+                            case "87":
+                                order.q_87 += amount
+                            case "90":
+                                order.q_90 += amount
+                            case "ulsd":
+                                order.q_ulsd += amount
+                        # update the total order quantity
+                        order.quantity += amount
+                                            
                     # update the entire truck status from PENDING 
-                    order.Order.status = "Ready"
-                    order.Order.last_updated = datetime.utcnow()
+                    order.status = "Ready"
+                    order.last_updated = datetime.utcnow()
                     db.session.commit()
                     response = {
                         "status":"success"
@@ -627,7 +652,7 @@ def cancel_order(id):
                     truck.available = truck.capacity
                     # set truck's available column to capacity
                     # use truck id to get the compartments with order id = id
-                    comps = db.session.query(Compartments).filter((Compartments.truck_id==d.truck_id) & (Compartments.order_id==id)).all()
+                    comps = db.session.query(Compartment).filter((Compartment.truck_id==d.truck_id) & (Compartment.order_id==id)).all()
                     for c in comps:
                         # remove petrol value from compartment
                         c.petrol=""
@@ -759,7 +784,7 @@ def trucks():
             cap = [int(x) for x in form.capacity.data.split(",")]
             for i, capacity in enumerate(cap):
                 compartment_no = i+1
-                comp = Compartments(truck.id, compartment_no, capacity)
+                comp = Compartment(truck.id, compartment_no, capacity)
                 db.session.add(comp)
             db.session.commit()
             response = {

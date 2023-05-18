@@ -57,10 +57,9 @@
       .then((data)=>{
           if (data.status == "success") {
             console.log("order created successfully");
-            $('form#addordermodal'),hide()
-            // location.reload();
+            location.reload();
           } else {
-            console.log(data.message);
+              console.log("failed to create order");
           }
       });
     }

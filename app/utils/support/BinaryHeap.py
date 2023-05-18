@@ -16,6 +16,9 @@ class BinaryHeap:
 
     # PREDICATES
     
+    def empty(self):
+        return self.v[0] == 0
+    
     def in_list(self, index_pos):
         return index_pos <= self.last_inserted_index and index_pos >= 2
     
@@ -60,21 +63,25 @@ class BinaryHeap:
     
     def pop(self):
         # pop/get the root node
-        node = self.v[self.root_index]
-        if self.size()>0:
-            # copy the last node to the root
-            self.v[self.root_index] = self.v[self.last_inserted_index]
-            # replace/set the original position of the copied node with NIL
-            self.v[self.last_inserted_index] = self.NIL
-            # update the index for the last inserted node
-            self.v[0] -= 1
-            self.last_inserted_index -= 1
-            # initiate the bubble_down method to organize the heap in order
-            self.bubble_down(self.root_index) 
-            # return the popped node
-        return node
+        if not self.empty():
+            node = self.v[self.root_index]
+            if self.size()>0:
+                # copy the last node to the root
+                self.v[self.root_index] = self.v[self.last_inserted_index]
+                # replace/set the original position of the copied node with NIL
+                self.v[self.last_inserted_index] = self.NIL
+                # update the index for the last inserted node
+                self.v[0] -= 1
+                self.last_inserted_index -= 1
+                # initiate the bubble_down method to organize the heap in order
+                self.bubble_down(self.root_index) 
+                # return the popped node
+            return node[1]
+        return None
     
     # SUPPORT
+    def get(self):
+        pass
     
     def bubble_up(self, next_insert_index_posn):
         if next_insert_index_posn > 2:
