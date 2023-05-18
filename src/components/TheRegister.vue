@@ -73,7 +73,7 @@
                     </div>
                     <div class="form-group">
                         <label for="contact_number">Contact Number</label>
-                        <input id="contact_number" name="contact_number" type="text" class="form-control">
+                        <input id="contact_number" name="contact_number" type="text" class="form-control" maxlength="10">
                     </div>
                     <div class="form-group">
                         <label for="email">Email</label>
@@ -89,7 +89,9 @@
                     </div>
                     <div class="form-group">
                         <label for="password">Password</label>
-                        <input id="password" name="password" type="password" class="form-control">
+                        <input v-model="pwd" id="password" name="password" type="password" class="form-control">
+                        <label for="confirm">Confirm</label>
+                        <input v-model="conf_pwd" id="confirm" name="confirm" type="password" class="form-control">
                     </div>
                 </div>
                 <input type="hidden" name="role" value="customer">
@@ -101,11 +103,15 @@
 
 <script setup >
 
+    import {ref} from 'vue'
+
     function register(event) {
         event.preventDefault();
 
         let form = new FormData($('form#register')[0])
         let url = "/api/v1/customers";
+        // let pwd = ref("");
+        // let conf_pwd = ref("");
 
         fetch(url, {
             method: 'POST',
@@ -126,6 +132,9 @@
                 $('form#register').trigger('reset');
             }
         })
+    
+
+        
     }
 </script>
 

@@ -7,8 +7,7 @@
   let customer;
   let order = `/api/v1/orders`;
 
-  let customer_id ;
-  let delivery_date = ref(Date());
+  let delivery_date = ref("");
   let delivery_time = ref("");
   let quantity = 0;
   let q_diesel = ref(0);
@@ -17,31 +16,28 @@
   let q_ulsd = ref(0);
   let preferred = ref("90");
   let location;
+  let customer_id;
   
   onMounted(() => {
-    if (id && typeof id == 'number' && localStorage['token']) {
-      // user is logged in on the frontend
-        fetch(url, {
-            method: 'GET',
-            headers: {
-                // token: `bearer ${localStorage['token']}`
-          }
-        })
-        .then((result)=>{
-            return result.json();
-        })
-        .then((data) => {
-            if (data.status == "success") {
-              customer = data.data;
-              location = customer['address_id'];
-            } else {
-              console.log(data.message);
+    fetch(url, {
+        method: 'GET',
+        headers: {
+            // token: `bearer ${localStorage['token']}`
+      }
+    })
+    .then((result)=>{
+        return result.json();
+    })
+    .then((data) => {
+        if (data.status == "success") {
+          customer = data.data;
+          location = customer['address_id'];
+          customer_id = customer['customer_id'];
+        } else {
+          console.log(data.message);
 
-            }
-        });
-    } else {
-        console.log("not logged in")
-    }
+        }
+    });
 
   });
 
@@ -49,22 +45,21 @@
   function addOrder() {
     if (id && typeof id == 'number') {
       console.log("Create Order function called");
-      let form = new FormData($('form#createOrderForm')[0]);
 
       fetch("/api/v1/orders", {
           method: 'POST',
-          headers: {'token':`bearer ${localStorage['token']}`},
-          body: form
+          headers: {},
+          body: new FormData($('form#createOrderForm')[0])
       })
       .then((result)=>{
           return result.json();
       })
       .then((data)=>{
           if (data.status == "success") {
-            console.log("post added successfully");
+            console.log("order created successfully");
             location.reload();
           } else {
-              console.log("failed to add post");
+              console.log("failed to create order");
           }
       });
     }
@@ -101,14 +96,14 @@
                 <div class="modal-body">
                     <form id="createOrderForm" action="" method="post" enctype="multipart/form-data">
                         <div class="form-group">
-                          <input :bind="id" name="customer_id" id="customer_id" cols="30" rows="2" class="form-control" maxlength="75" hidden>
+                          <input :value="customer_id" name="customer_id" id="customer_id" cols="30" rows="2" class="form-control" maxlength="75" hidden>
                           <div class="form-group">
                             <label for="caption">Delivery Date</label>
-                            <input v-model="delivery_date" type="date" name="delivery_time" id="delivery_time" cols="30" rows="2" class="form-control" maxlength="75">
+                            <input v-model="delivery_date" type="date" name="delivery_date" id="delivery_date" cols="30" rows="2" class="form-control" maxlength="75" >
                           </div>
                           <div class="form-group">
                             <label for="caption">Delivery Time</label>
-                            <select v-model="delivery_time" name="quantity" id="quantity" cols="30" rows="2" class="form-control" maxlength="75">
+                            <select v-model="delivery_time" name="delivery_time" id="delivery_time" cols="30" rows="2" class="form-control" maxlength="75">
                               <option value="8:00 AM">8:00 AM</option>
                               <option value="12:00 PM">12:00 PM</option>
                               <option value="4:00 PM">4:00 PM</option>
