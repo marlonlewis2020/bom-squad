@@ -12,10 +12,10 @@ def strtodate(date:str):
     month_day = month_day.split(" ")
     month_str, day = month_day[0].strip(), int(month_day[1].strip())
     for m in range(1, 13):
-        if datetime(year,m,day).strftime("%B").casefold()==month_str.casefold():
+        if datetime(year,m,1).strftime("%B").casefold()==month_str.casefold():
             month = m
             break
-    print(format_date(datetime(year,month,day)))
+    # print(format_date(datetime(year,month,day)))
     return datetime(year,month,day)
     
 def sql_date(x):
