@@ -3,7 +3,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
       <div class="container-fluid">
         <div class="brand">
-          <a v-if="login" class="navbar-brand" :href="`/users/${id}`"><img class="camera-img" src="./icons/oil-tanker.png" alt="camera image"> Truck Scheduling</a>
+          <a v-if="login" class="navbar-brand" href="/dashboard"><img class="camera-img" src="./icons/oil-tanker.png" alt="camera image"> Truck Scheduling</a>
           <a v-else class="navbar-brand" href="/"><img class="camera-img" src="./icons/oil-tanker.png" alt="camera image"> Truck Scheduling</a>
         </div>
         <div class="menu float-end">

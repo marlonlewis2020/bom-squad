@@ -453,7 +453,7 @@ def orders():
         '''
         form = OrderForm()
         balance = {}
-        # added = False
+        added = False
         
         # use best fit to fill the 
         try:
@@ -476,7 +476,7 @@ def orders():
             db.session.add(order)
             db.session.commit()
             db.session.refresh(order)
-            # added = True
+            added = True
             
             # critical operation: book trucks and fill compartments to best match order (just under or equal to original order amount)
             # keek waiting until critical operation have been performed/completed            
@@ -562,7 +562,8 @@ def orders():
             if not ORDER_QUEUE.empty():
                 ORDER_QUEUE.get()
             db.session.rollback()
-            db.session.delete(order)
+            if added:
+                db.session.delete(order)
             response = {
                 "status":"error"
             }
