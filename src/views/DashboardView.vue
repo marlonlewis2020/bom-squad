@@ -57,6 +57,7 @@
       .then((data)=>{
           if (data.status == "success") {
             console.log("order created successfully");
+            console.log(data)
             $("[data-dismiss=modal]").trigger({ type: "click" });
           } else {
               console.log(data);
