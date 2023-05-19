@@ -57,9 +57,9 @@
       .then((data)=>{
           if (data.status == "success") {
             console.log("order created successfully");
-            location.reload();
+            $("[data-dismiss=modal]").trigger({ type: "click" });
           } else {
-              console.log("failed to create order");
+              console.log(data);
           }
       });
     }
@@ -99,11 +99,11 @@
                           <input :value="customer_id" name="customer_id" id="customer_id" cols="30" rows="2" class="form-control" maxlength="75" hidden>
                           <div class="form-group">
                             <label for="caption">Delivery Date</label>
-                            <input v-model="delivery_date" type="date" name="delivery_date" id="delivery_date" cols="30" rows="2" class="form-control" maxlength="75" >
+                            <input v-model="delivery_date" type="date" name="delivery_date" id="delivery_date" cols="30" rows="2" class="form-control" maxlength="75" required>
                           </div>
                           <div class="form-group">
                             <label for="caption">Delivery Time</label>
-                            <select v-model="delivery_time" name="delivery_time" id="delivery_time" cols="30" rows="2" class="form-control" maxlength="75">
+                            <select v-model="delivery_time" name="delivery_time" id="delivery_time" cols="30" rows="2" class="form-control" maxlength="75" required>
                               <option value="8:00 AM">8:00 AM</option>
                               <option value="12:00 PM">12:00 PM</option>
                               <option value="4:00 PM">4:00 PM</option>

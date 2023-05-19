@@ -43,6 +43,15 @@ class Graph:
         
         self.discovered = Queue()
         self.visited = []
+        
+        
+    def book_truck(self, truck_id, filled, available):
+        delivery = Delivery(self.order_id,  self.petrol, self.delivery_date, self.delivery_time, truck_id, self.start_node, filled, available)
+        db.session.add(delivery)
+        db.session.commit()
+        db.session.refresh(delivery)
+        return (delivery.id, truck_id)
+        
 
         
     def load_area_nodes2(self):
@@ -121,7 +130,7 @@ class Graph:
         if truck:
             while self.QTY >= truck.capacity:
                 # fill truck
-                filled = truck.fill_all( self.order_id, self.petrol, self.start_node, self.delivery_date, self.delivery_time)
+                self.QTY -= truck.fill_all( self.order_id, self.QTY, self.petrol, self.start_node, self.delivery_date, self.delivery_time)
                 # update the original order qty
                 self.QTY-=truck.capacity
                 if self.QTY == 0:
@@ -223,16 +232,17 @@ class Graph:
                     truck = db.session.query(Truck).filter_by(id=et.truck_id).scalar()
                     self.QTY = truck.fill_each(self.order_id, self.QTY, self.petrol, self.delivery_date, self.delivery_time, self.start_node)
                 else:
-                    self.QTY -= truck.fill_all(self.order_id, self.petrol, self.start_node, self.delivery_date, self.delivery_time)
+                    self.QTY -= truck.fill_all(self.order_id, self.QTY, self.petrol, self.start_node, self.delivery_date, self.delivery_time)
                 
                 if self.QTY > 0:
                     pri = abs(self.QTY-truck.available())
-                    self.upgrade_pq.heap_insert((pri, truck.available()))
+                    self.upgrade_pq.heap_insert((pri, truck))
                     
                     if len(truck_list):
                         for truck in truck_list:
-                            pri = abs(self.QTY-truck.available())
-                            self.upgrade_pq.heap_insert((pri, truck.available()))
+                            if truck.available():
+                                pri = abs(self.QTY-truck.available())
+                                self.upgrade_pq.heap_insert((pri, truck))
         return self.upgrade_pq
             
     
