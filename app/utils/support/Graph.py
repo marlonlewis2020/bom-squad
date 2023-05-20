@@ -45,15 +45,6 @@ class Graph:
         self.visited = []
         
         
-    def book_truck(self, truck_id, filled, available):
-        delivery = Delivery(self.order_id,  self.petrol, self.delivery_date, self.delivery_time, truck_id, self.start_node, filled, available)
-        db.session.add(delivery)
-        db.session.commit()
-        db.session.refresh(delivery)
-        return (delivery.id, truck_id)
-        
-
-        
     def load_area_nodes2(self):
         booked_ids = set()
         # 1. get all nodes
@@ -170,51 +161,11 @@ class Graph:
                 priority_pq.heap_insert((-truck.available(), truck))
         while not priority_pq.empty():
             b_truck = priority_pq.pop() # fill the remaining balance
-            if b_truck:
-                if self.QTY >= b_truck.available():
-                    # fill order
-                    balance = b_truck.available()
-                    try:
-                        order = db.session.query(Order).filter_by(id=self.order_id).scalar()
-                        # get existing delivery
-                        delivery = db.session.query(Delivery).filter(Delivery.truck_id==b_truck.id).first()
-                        delivery.filled += balance
-                        delivery.available -= balance
-                        # delivery = Delivery(self.order_id, self.petrol, self.delivery_date, self.delivery_time, b_truck.id, self.start_node, balance, 0)
-                        db.session.add(delivery)
-                        db.session.commit()
-                        created = True
-                        db.session.refresh(delivery)
-                        
-                        d_comps = b_truck.available_compartments()
-                        for comp in d_comps:
-                            # fill all compartments of this truck
-                            comp = DeliveryCompartment(delivery.id, self.order_id, comp.id, self.start_node, self.petrol, comp.capacity)
-                            db.session.add(comp)
-                        match self.petrol:
-                            # update the specific fuel type quantity
-                            case "diesel":
-                                order.q_diesel += balance
-                            case "87":
-                                order.q_87 += balance
-                            case "90":
-                                order.q_90 += balance
-                            case "ulsd":
-                                order.q_ulsd += balance
-                        # update the total order quantity
-                        order.quantity += balance
-                        db.session.commit()
-                    except Exception as e:
-                        created = False
-                        print(e)
-                        truck_list.append(b_truck)
-                        if created:
-                            db.session.delete(delivery)
-                            db.session.commit()
-                            db.session.rollback()
-                else:
-                    self.QTY = b_truck.fill_each(self.order_id, self.QTY, self.petrol, self.delivery_date, self.delivery_time, self.start_node)
-                    if b_truck.available() > 0 and b_truck not in truck_list: truck_list.append(b_truck)
+            if b_truck and self.QTY >= b_truck.available():
+                # fill order
+                self.QTY = b_truck.fill_each(self.order_id, self.QTY, self.petrol, self.delivery_date, self.delivery_time, self.start_node)
+                db.session.commit()
+                if b_truck.available() > 0 and b_truck not in truck_list: truck_list.append(b_truck)
         
         # add remaining trucks into upgrade queue
         # FILL THE COMPARTMENTS OF THE AVAILABLE TRUCKS CLOSEST IN SIZE TO THE ORDER SIZE
@@ -232,7 +183,10 @@ class Graph:
                     truck = db.session.query(Truck).filter_by(id=et.truck_id).scalar()
                     self.QTY = truck.fill_each(self.order_id, self.QTY, self.petrol, self.delivery_date, self.delivery_time, self.start_node)
                 else:
-                    self.QTY -= truck.fill_all(self.order_id, self.QTY, self.petrol, self.start_node, self.delivery_date, self.delivery_time)
+                    if self.QTY < truck.available():
+                        self.QTY = truck.fill_each(self.order_id, self.QTY, self.petrol, self.delivery_date, self.delivery_time, self.start_node)
+                    else:
+                        self.QTY -= truck.fill_all(self.order_id, self.QTY, self.petrol, self.start_node, self.delivery_date, self.delivery_time)
                 
                 if self.QTY > 0:
                     pri = abs(self.QTY-truck.available())

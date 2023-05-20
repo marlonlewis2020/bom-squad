@@ -651,8 +651,11 @@ def confirm_order(id):
                         for comp in comps:
                             # fill all compartments of this truck
                             if comp.capacity == amount:
-                                delivery = db.session.query(DeliveryCompartment).filter_by(truck_id=truck_id).first()
-                                comp = DeliveryCompartment( delivery.id, id, comp.id, truck_id, gas, comp.capacity)
+                                # update delivery
+                                # fill delivery compartment
+                                delivery_comp = db.session.query(Delivery).filter_by(truck_id=truck_id).first()
+                                
+                                comp = DeliveryCompartment( delivery_comp.id, id, comp.id, truck_id, gas, comp.capacity)
                                 db.session.add(comp)
                         match gas:
                             # update the specific fuel type quantity
