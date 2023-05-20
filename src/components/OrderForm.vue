@@ -1,100 +1,100 @@
 <template>
     <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modalLabel"> Place Order</h5>
-                    <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close" @click="clear" >x</button>
+      <div class="modal-header">
+          <h5 class="modal-title" id="modalLabel"> Place Order</h5>
+          <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close" @click="clear" >x</button>
+      </div>
+      <div class="modal-body">
+          <form id="createOrderForm" action="" method="post" enctype="multipart/form-data">
+              <div class="form-group">
+                  <div class="form-group" v-if="role='admin'">
+                      <label>Select Customer</label>
+                      <select name="customer" id="select_customer" @change="updateCustomer" class="form-control">
+                          <option></option>
+                          <option 
+                              v-for="(customer, index) in customers" 
+                              :value="customer['customerID']" 
+                              :key='index' > {{ customer['company'] }} - {{ customer['branch'] }} </option>
+                      </select>
+                      <input name="customer_id" :value="customer_id" id="customer_id" cols="30" rows="2" class="form-control" maxlength="75" hidden>
+                  </div>
+                <div class="form-group">
+                  <label for="delivery_date">Delivery Date</label>
+                  <input v-model="delivery_date" type="date" name="delivery_date" id="delivery_date" cols="30" rows="2" class="form-control" maxlength="75" required>
                 </div>
-                <div class="modal-body">
-                    <form id="createOrderForm" action="" method="post" enctype="multipart/form-data">
-                        <div class="form-group">
-                            <div class="form-group" v-if="role='admin'">
-                                <label>Select Customer</label>
-                                <select name="customer" id="select_customer" @change="updateCustomer" class="form-control">
-                                    <option></option>
-                                    <option 
-                                        v-for="(customer, index) in customers" 
-                                        :value="customer['customerID']" 
-                                        :key='index' > {{ customer['company'] }} - {{ customer['branch'] }} </option>
-                                </select>
-                                <input name="customer_id" :value="customer_id" id="customer_id" cols="30" rows="2" class="form-control" maxlength="75" hidden>
-                            </div>
-                          <div class="form-group">
-                            <label for="caption">Delivery Date</label>
-                            <input v-model="delivery_date" type="date" name="delivery_date" id="delivery_date" cols="30" rows="2" class="form-control" maxlength="75" required>
-                          </div>
-                          <div class="form-group">
-                            <label for="caption">Delivery Time</label>
-                            <select name="delivery_time" id="delivery_time" cols="30" rows="2" class="form-control" maxlength="75" required>
-                              <option value="Early" selected>Early</option>
-                              <option value="Late">Late</option>
-                            </select>
-                          </div>
-                          <div class="form-group" hidden>
-                            <label for="caption">Quantity</label>
-                            <input v-bind:value="quantity" name="quantity" id="quantity" cols="30" rows="2" class="form-control" maxlength="75" v-on:change="change">
-                          </div>
-                          <div class="form-group">
-                            <label for="caption">Diesel</label>
-                            <input v-model="q_diesel" type="number" @change="updateQuantity" name="q_diesel" id="q_diesel" cols="30" rows="2" class="form-control" maxlength="75">
-                          </div>
-                          <div class="form-group">
-                            <label for="caption">87</label>
-                            <input v-model="q_87" type="number" @change="updateQuantity" name="q_87" id="q_87" cols="30" rows="2" class="form-control" maxlength="75">
-                          </div>
-                          <div class="form-group">
-                            <label for="caption">90</label>
-                            <input v-model="q_90" type="number" @change="updateQuantity" name="q_90" id="q_90" cols="30" rows="2" class="form-control" maxlength="75">
-                          </div>
-                          <div class="form-group">
-                            <label for="caption">ulsd</label>
-                            <input v-model="q_ulsd" type="number" @change="updateQuantity" name="q_ulsd" id="q_ulsd" cols="30" rows="2" class="form-control" maxlength="75">
-                          </div>
-                          <div class="form-group" hidden>
-                            <label for="caption">Price</label>
-                            <input value="0.00" type="decimal" name="price" id="price" cols="30" rows="2" class="form-control" maxlength="75">
-                          </div>
-                          <div class="form-group" hidden>
-                            <label for="caption">Status</label>
-                            <input value="Pending" name="status" id="status" cols="30" rows="2" class="form-control" maxlength="75" hidden>
-                          </div>
-                          <div class="form-group" hidden>
-                            <label for="caption" >Address</label>
-                            <input :value="cx['address_id']" type="text" name="location" id="location" cols="30" rows="2" class="form-control" maxlength="75">
-                          </div>
-                          <div class="form-group">
-                            <label for="caption">Preference</label>
-                            <select v-model="preferred" name="preferred" id="preferred" cols="30" rows="2" class="form-control" maxlength="75">
-                              <option value="diesel">diesel</option>
-                              <option value="87">87</option>
-                              <option value="90">90</option>
-                              <option value="ulsd">ulsd</option>
-                            </select>
-                          </div>
-                        </div>
-                    </form>
+                <div class="form-group">
+                  <label for="delivery_time">Delivery Time</label>
+                  <select name="delivery_time" id="delivery_time" cols="30" rows="2" class="form-control" maxlength="75" required>
+                    <option value="Early" selected>Early</option>
+                    <option value="Late">Late</option>
+                  </select>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" 
-                      v-on:click="addOrder" 
-                      class="btn btn-primary">
-                        <img id="save" src="../components/icons/save.png" alt="save" class="text-white" />  
-                        Save
-                    </button>
-                    <button 
-                      type="button" 
-                      class="btn btn-info"
-                      @click="clear" >
-                        Clear
-                    </button>
-                    <button 
-                      type="button" 
-                      class="btn btn-secondary"
-                      @click="close" 
-                      data-dismiss="modal">
-                        Close
-                    </button>
+                <div class="form-group" hidden>
+                  <label for="quantity">Quantity</label>
+                  <input v-bind:value="quantity" name="quantity" id="quantity" cols="30" rows="2" class="form-control" maxlength="75" v-on:change="change">
                 </div>
-            </div>
+                <div class="form-group">
+                  <label for="q_diesel">Diesel</label>
+                  <input v-model="q_diesel" type="number" @change="updateQuantity" name="q_diesel" id="q_diesel" cols="30" rows="2" class="form-control" maxlength="75">
+                </div>
+                <div class="form-group">
+                  <label for="q_87">87</label>
+                  <input v-model="q_87" type="number" @change="updateQuantity" name="q_87" id="q_87" cols="30" rows="2" class="form-control" maxlength="75">
+                </div>
+                <div class="form-group">
+                  <label for="q_90">90</label>
+                  <input v-model="q_90" type="number" @change="updateQuantity" name="q_90" id="q_90" cols="30" rows="2" class="form-control" maxlength="75">
+                </div>
+                <div class="form-group">
+                  <label for="q_ulsd">ulsd</label>
+                  <input v-model="q_ulsd" type="number" @change="updateQuantity" name="q_ulsd" id="q_ulsd" cols="30" rows="2" class="form-control" maxlength="75">
+                </div>
+                <div class="form-group" hidden>
+                  <label for="price">Price</label>
+                  <input value="0.00" type="decimal" name="price" id="price" cols="30" rows="2" class="form-control" maxlength="75">
+                </div>
+                <div class="form-group" hidden>
+                  <label for="status">Status</label>
+                  <input value="Pending" name="status" id="status" cols="30" rows="2" class="form-control" maxlength="75" hidden>
+                </div>
+                <div class="form-group" hidden>
+                  <label for="location" >Address</label>
+                  <input :value="cx['address_id']" type="text" name="location" id="location" cols="30" rows="2" class="form-control" maxlength="75">
+                </div>
+                <div class="form-group">
+                  <label for="preferred">Preference</label>
+                  <select v-model="preferred" name="preferred" id="preferred" cols="30" rows="2" class="form-control" maxlength="75">
+                    <option value="diesel">diesel</option>
+                    <option value="87">87</option>
+                    <option value="90">90</option>
+                    <option value="ulsd">ulsd</option>
+                  </select>
+                </div>
+              </div>
+          </form>
+      </div>
+      <div class="modal-footer">
+          <button type="button" 
+            v-on:click="addOrder" 
+            class="btn btn-primary">
+              <img id="save" src="../components/icons/save.png" alt="save" class="text-white" />  
+              Save
+          </button>
+          <button 
+            type="button" 
+            class="btn btn-info"
+            @click="clear" >
+              Clear
+          </button>
+          <button 
+            type="button" 
+            class="btn btn-secondary"
+            @click="close" 
+            data-dismiss="modal">
+              Close
+          </button>
+      </div>
+    </div>
 </template>
 
 <script setup lang='ts'>
@@ -216,15 +216,15 @@
     }
 
     function clear() {
-        delivery_date.value = ""
-        delivery_time.value = ""
-        quantity = 0
-        q_diesel.value = 0
-        q_87.value = 0
-        q_90.value = 0
-        q_ulsd.value = 0
-        preferred.value = "90"
-        location.value = ""
+        delivery_date.value = "";
+        delivery_time.value = "";
+        quantity = 0;
+        q_diesel.value = 0;
+        q_87.value = 0;
+        q_90.value = 0;
+        q_ulsd.value = 0;
+        preferred.value = "90";
+        location.value = "";
     }
 
     function updateQuantity() {
@@ -243,6 +243,7 @@
     border: none;
     background-color: none;
   }
+  
   .btn-close {
     border-width: 0;
     border-color: rgb(182, 98, 98);

@@ -2,6 +2,8 @@
   import { ref, onMounted } from 'vue'
   import OrderForm from '../components/OrderForm.vue'
   import TheOrders from '../components/TheOrders.vue'
+  import TheSchedule from '../components/TheOrders.vue'
+  import TheRegister from '../components/TheRegister.vue'
   
   let id:number  = Number(localStorage['id']);
   
@@ -52,7 +54,7 @@
 
   function close() {
     $("[data-dismiss=modal]").trigger({ type: "click" });
-    location.reload();
+    // location.reload();
   }
 
 </script>
@@ -67,7 +69,7 @@
           @click="clear"
           type="button" 
           value="New Order" 
-          class="admin text-center btn btn-primary float-end" 
+          class="admin text-center btn btn-primary" 
           data-toggle="modal" 
           data-target="#addordermodal">
           New Order
@@ -77,48 +79,62 @@
           v-if="id" 
           @click="clear"
           type="button" 
-          value="New Order" 
-          class="admin text-center btn btn-dark float-end" 
+          value="New Customer" 
+          class="admin text-center btn btn-dark" 
           data-toggle="modal" 
           data-target="#addcustomermodal">
           New Customer
         </button>
 
+        <button 
+          v-if="id" 
+          @click="clear"
+          type="button" 
+          value="New Truck" 
+          class="admin text-center btn btn-info" 
+          data-toggle="modal" 
+          data-target="#addtruckmodal">
+          New Truck
+        </button>
       </div>
 
       <div class="row">
       
+        <TheOrders id="orders" 
+        :orders="page_orders"
+        :page="page"
+        :perPage="perPage"
+        :final_page="final_page"
+        @cancel="cancelOrder"
+        @update="updateStatus"
+        @view="viewOrder" 
+        @updatePage="updatePage"
+        @close="close"/>   
 
-      <button 
-        v-if="id" 
-        @click="clear"
-        type="button" 
-        value="New Order" 
-        class="admin text-center btn btn-info float-end" 
-        data-toggle="modal" 
-        data-target="#addtruckmodal">
-        New Truck
-      </button>
+        <!-- Add Order Modal -->
+        <div id="addordermodal" class="modal fade">
+          <div class="modal-dialog">
+              <OrderForm @close="close" />
+          </div>
+        </div>
 
-      <TheOrders id="orders" 
-      :orders="page_orders"
-      :page="page"
-      :perPage="perPage"
-      :final_page="final_page"
-      @cancel="cancelOrder"
-      @update="updateStatus"
-      @view="viewOrder" 
-      @updatePage="updatePage"
-      @close="close"/>   
+        <!-- Add Customer Modal -->
+        <div id="addcustomermodal" class="modal fade">
+          <div class="modal-dialog">
+              <TheRegister @close="close" />
+          </div>
+        </div>
 
-      <div id="addordermodal" class="modal fade">
-        <div class="modal-dialog">
-            <OrderForm @close="close" />
+        <!-- Add Truck Modal -->
+        <div id="addtruckmodal" class="modal fade">
+          <div class="modal-dialog">
+              <TruckForm @close="close" />
+          </div>
         </div>
       </div>
       <div class="row">
+        <!-- <TheSchedule /> -->
       </div>
-    </div>
     </div>
   </main>
 </template>

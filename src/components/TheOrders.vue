@@ -39,7 +39,7 @@
                         <option value="delivering" v-if="order['status']!=='Pending' && order['status']!=='Delivering' && order['status']!=='Delivered'">Out for Delivery</option>
                         <option value="delivered" v-if="order['status']!=='Pending' && order['status']!=='Processing' && order['status']!=='Delivered'">Delivered</option>
                     </select></td>
-                    <td :id="order['orderID']-actions">
+                    <td :id="order['orderID']+`_actions`">
                         <div class="action_button btn btn-primary" @click="view(order['orderID'])"> View</div>
                         <div class="action_button btn btn-primary" @click="update(order['orderID'])"> Update</div>
                         <div class="action_button btn btn-dark" @click="cancel(order['orderID'])"> Cancel</div>
