@@ -140,9 +140,9 @@
     });
 
     const emit = defineEmits<{
-        (event:'addOrder'): void
         (event:'close'): void
         (event:'change'): void
+        (event:'refresh'): void
     }>();
 
     function updateCustomer(event) {
@@ -175,8 +175,8 @@
                     console.log("order created successfully");
                     alert("order created successfully");
                     console.log(data);
-                    emit('addOrder');
                     emit('close');
+                    emit('refresh');
                 } else {
                     console.log(data);
                 }

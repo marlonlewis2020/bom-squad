@@ -564,18 +564,14 @@ def orders():
                 if sub_order.QTY > 0:
                     result = sub_order.fill_trucks()
                     total_left += result[0]
-                    balance[gas]={
+                    balance[f"q_{sub_order.petrol}_order"]={
                         "ordered":sub_order.O_QTY,
                         "filled":sub_order.O_QTY-result[0],
                     }
-                    
-                    if str(gas.split("_")[1]).strip() == form.preferred.data.strip():
-                        balance[gas]["upgrades"]=result[1]
             
             # get the filled qtys and update order qty's accordingly
             # update the balance variable with the upgrade balance
     
-            
             # update the existing order using order object
             
             # release lock
@@ -590,14 +586,14 @@ def orders():
                 "order_filled":q-total_left,
                 "options":balance
             }
-            # if total_left!=0:
+            # if total_left:
             #     response['status']="error"
             if q > 0 and q==total_left:
                 # order cannot be filled. No trucks are available for the date
                 db.session.delete(order)
                 db.session.commit()
-                response["status"] = "partial"
-                response["message"] = "unable to fulfill complete order at this time. Please try a different date."
+                response["status"] = "unavailable"
+                response["message"] = "unable to fulfill order at this time. Please try a different date."
             else:
                 for gas in i_orders:
                     fill_order = total_order[gas]
@@ -605,6 +601,9 @@ def orders():
                         if not fill_order.upgrade_pq.empty():
                             ug = fill_order.upgrade_pq.pop()
                             lock_truck(order.id, ug, gas)
+                            balance[gas]["upgrades"]=[x.capacity for x in ug.available_compartments()]
+                        else:
+                            balance[gas]["upgrades"]=[]
         except MySQLdb.OperationalError as ope:
             print(ope)
         

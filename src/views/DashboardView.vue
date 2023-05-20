@@ -57,6 +57,21 @@
     // location.reload();
   }
 
+  function refresh() {
+    fetch(order_url, {headers:{
+      // Authorization: `bearer ${localStorage['token']}`
+    }})
+    .then((result) => result.json())
+    .then((json_result) => {
+      if (json_result.status=="success") {
+        orders.value = json_result.data;
+        total.value = orders.value.length;
+        final_page.value = Math.ceil(total.value/perPage);
+        updatePage(page.value);
+      }
+    });
+  }
+
 </script>
 
 <template>
@@ -114,7 +129,7 @@
         <!-- Add Order Modal -->
         <div id="addordermodal" class="modal fade">
           <div class="modal-dialog">
-              <OrderForm @close="close" />
+              <OrderForm @close="close" @refresh="refresh" />
           </div>
         </div>
 
