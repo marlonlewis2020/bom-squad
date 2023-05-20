@@ -199,7 +199,6 @@ class Truck(db.Model):
         # This is the priority Truck
         # Get the sizes of all its of its compartments
         comps = self.get_compartments()
-        comp_id_list = [x.id for x in comps]
         comp_cap_list = [x.capacity for x in comps]
         total = sum([x.capacity for x in comps])
         # call the permutation function
@@ -230,6 +229,7 @@ class Truck(db.Model):
                                 order.q_90 += v
                             case "ulsd":
                                 order.q_ulsd += v
+                
                 # update the total order quantity
                 order.quantity += val
                 db.session.commit()

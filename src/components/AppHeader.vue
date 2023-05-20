@@ -52,8 +52,7 @@
     })
     .then((data)=>{
         // update the token and id in localStorage
-        localStorage.removeItem('token');
-        localStorage.removeItem('id');
+        localStorage.clear();
         window.location.assign("/");
     });
   }

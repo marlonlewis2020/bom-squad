@@ -10,8 +10,7 @@ from .forms import CustomerForm, AddressForm, OrderForm, UserForm, TruckForm, Lo
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.utils.utils import format_date, sql_date, strtodate
 from queue import Queue
-# from app.utils.support.Graph import Graph
-from app.utils.support.G import Graph
+from app.utils.support.Graph import Graph
 import jwt
 
 ACTIVE = {}
@@ -41,12 +40,12 @@ def login():
             user = User.query.filter_by(username=username).first()
             print(user)
             if user is not None and check_password_hash(user.password, password):
-                payload = {'sub': user.id, "iat":timestamp, "exp": expiry_date}
+                payload = {'sub': user.id, 'role': user.role, 'is_active':user.is_active, "iat":timestamp, "exp": expiry_date}
                 
                 token = jwt.encode(payload, app.config['SECRET_KEY'], algorithm = 'HS256')
                 if login_user(user):
                     load_user(user.id)
-                return jsonify(status='success', message = 'User successfully logged in.', id=user.id, token=token)
+                return jsonify(status='success', message = 'User successfully logged in.', id=user.id, role=user.role, token=token)
             return jsonify(errors="Invalid username or password")
         except Exception as e:
             print(e)
@@ -90,7 +89,57 @@ def generate_token():
 
 # -- CUSTOMER END POINTS -- 
 
-@app.route('/api/v1/customers/<id>', methods=['GET','PUT'])
+@app.route('/api/v1/customers/all', methods=['GET'])
+def get_customers():
+    """ Gets or updates a customer's details """
+    # get customer or updates customer by id
+    if request.method == 'GET':
+        # GET THE ORDER DETAILS
+        ''' VIEW RETURN EXAMPLE BELOW:
+        {
+            status: "success",
+            data: {
+                customerID: "00000001",
+                company:"Total",
+                branch:"Barbican",
+                phoneNumber:"(876)-555-0555",
+                email:"totalbarbican@gmail.com",
+                purchasingOfficer:"Robert Desnoes",
+                location:"12 Barbican Road, Barbican, St. Andrew, Ja.",
+            }
+        }
+        '''
+        response = {
+            'status':'error',
+        }
+        try:
+            customers = db.session.query(Customer).all()
+                # .add_column(Customer.id, Customer.company, Customer.branch, Customer.officer, User.contact_number, User.email, Address.address_line_1, Address.city, Address.parish, Address.country)\
+            
+            if customers is not None:  
+                data = []
+                for customer in customers:
+                    location = db.session.query(Address).filter_by(id=customer.address_id).scalar() 
+                    address = "{} {}, {}, {}, {}".format(location.address_line_1, location.city, location.parish, location.country, location.postal_code)
+                    data.append({
+                        'customer_id':customer.id,
+                        'company':customer.company,
+                        'branch':customer.branch,
+                        'contact_number':customer.contact_number,
+                        'email':customer.email,
+                        'officer':customer.officer,
+                        'location':address,
+                        'address_id':location.id,
+                    })
+                response['status'] = 'success'
+                response['data'] = data
+        except Exception as e:
+            print(e)
+            response['message']='Something went wrong!'
+        
+        return make_response(response)
+
+@app.route('/api/v1/customers/<int:id>', methods=['GET','PUT'])
 # @login_required
 def customer(id):
     """ Gets or updates a customer's details """
@@ -304,7 +353,8 @@ def order(id):
                 customerName:"Total Barbican",
                 address:"12 Barbican Road, Barbican, St. Andrew, Jamaica",
                 deliveryDate:"2023-04-30",
-                deliveryTime:"12:00 PM"
+                deliveryTime:"12:00 PM",
+                status:"Pending"
             }    
         }
         '''
@@ -540,12 +590,14 @@ def orders():
                 "order_filled":q-total_left,
                 "options":balance
             }
-            if q==total_left:
+            # if total_left!=0:
+            #     response['status']="error"
+            if q > 0 and q==total_left:
                 # order cannot be filled. No trucks are available for the date
                 db.session.delete(order)
                 db.session.commit()
-                response["status"] = "error"
-                response["message"] = "unable to fulfill order at this time. Please try a different date."
+                response["status"] = "partial"
+                response["message"] = "unable to fulfill complete order at this time. Please try a different date."
             else:
                 for gas in i_orders:
                     fill_order = total_order[gas]
@@ -574,7 +626,7 @@ def orders():
         
     return make_response(response)
 
-@app.route('/api/v1/orders/<id>', methods=['POST'])
+@app.route('/api/v1/orders/<int:id>', methods=['POST'])
 # @login_required
 def confirm_order(id):
     """Confirm a pending order"""

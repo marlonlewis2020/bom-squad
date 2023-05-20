@@ -23,7 +23,7 @@
         (event: 'fail', errors:any, message:string): void
         (event: 'success'): void
     }>();
-
+    let id = ref(0);
     let status = ref("");
     let errors = ref([]);
     let message = ref("");
@@ -81,7 +81,8 @@
                     clearLogin();
                     // persistent storage of authorization token
                     localStorage["token"] = data.token ;
-                    let id = localStorage["id"] = data.id ;
+                    id = localStorage["id"] = data.id ;
+                    localStorage["role"] = data.role ;
                     success();
                     clear();
                     console.log("login successful");
