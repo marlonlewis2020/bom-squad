@@ -588,8 +588,12 @@ def orders():
                 "order_filled":q-total_left,
                 "options":balance
             }
-            # if total_left:
-            #     response['status']="error"
+            if order.quantity == 0:
+                db.session.delete(order)
+                db.session.commit()
+                response['status'] = "invalid"
+                response['message'] = "order is invalid"
+                
             if q > 0 and q==total_left:
                 # order cannot be filled. No trucks are available for the date
                 db.session.delete(order)
