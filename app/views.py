@@ -555,18 +555,20 @@ def orders():
             i_orders = total_order.keys()
             total_left = 0
             for gas in i_orders: # insert into priority queue
-                sub_order = total_order[gas]
-                if gas == preferred:
-                    prioritized_order.heap_insert((0, sub_order))
-                else:
-                    prioritized_order.heap_insert((1, sub_order))
+                sub_order = total_order.get(gas, None)
+                if sub_order:
+                    if gas == preferred:
+                        prioritized_order.heap_insert((0, sub_order))
+                    else:
+                        prioritized_order.heap_insert((1, sub_order))
                     
             while not prioritized_order.empty():
                 sub_order = prioritized_order.pop()
                 if sub_order.QTY > 0:
                     result = sub_order.fill_trucks()
                     total_left += result[0]
-                    balance[f"q_{sub_order.petrol}_order"]={
+                    priority_type = f"q_{sub_order.petrol}_order"
+                    balance[priority_type]={
                         "ordered":sub_order.O_QTY,
                         "filled":sub_order.O_QTY-result[0],
                     }
@@ -602,14 +604,17 @@ def orders():
                 response["message"] = "unable to fulfill order at this time. Please try a different date."
             else:
                 for gas in i_orders:
-                    fill_order = total_order[gas]
-                    if str(form.preferred.data).strip().casefold() == str(gas.split("_")[1]).casefold().strip():
-                        if not fill_order.upgrade_pq.empty():
-                            ug = fill_order.upgrade_pq.pop()
-                            lock_truck(order.id, ug, gas)
-                            balance[gas]["upgrades"]=[x.capacity for x in ug.available_compartments(fill_order.delivery_date, fill_order.delivery_time)]
-                        else:
-                            balance[gas]["upgrades"]=[]
+                    fill_order = total_order.get(gas, None)
+                    if fill_order:
+                        if str(form.preferred.data).strip().casefold() == str(gas.split("_")[1]).casefold().strip():
+                            if not fill_order.upgrade_pq.empty():
+                                ug = fill_order.upgrade_pq.pop()
+                                lock_truck(order.id, ug, gas)
+                                if balance.get(gas, None):
+                                    balance[gas]["upgrades"]=[x.capacity for x in ug.available_compartments(fill_order.delivery_date, fill_order.delivery_time)]
+                            else:
+                                if balance.get(gas, None):
+                                    balance[gas]["upgrades"]=[]
         except MySQLdb.OperationalError as ope:
             print(ope)
         
@@ -621,10 +626,7 @@ def orders():
             db.session.rollback()
             if added:
                 db.session.delete(order)
-            response = {
-                "status":"error"
-            }
-            response['message'] = "Unable to add order."
+            
             # if added:
                 # db.session.delete(order)
                 # db.session.commit()

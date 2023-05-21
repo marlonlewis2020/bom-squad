@@ -160,7 +160,6 @@
         let error_weight = 'bold';
         if (id && typeof id == 'number' && delivery_date.value!=="" && $('#delivery_time').val()!=="" && $('#select_customer').val()!=="") {
             console.log("Create Order function called");
-            console.log($('form#createOrderForm')[0]);
 
             fetch("/api/v1/orders", {
                 method: 'POST',

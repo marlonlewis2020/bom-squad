@@ -115,8 +115,38 @@
       </div>
 
       <div class="row">
-      
+        
+        <div v-if="!orders.length" class="placeholder">
+          <h3>Welcome to the Truck Scheduling App</h3>
+          <small>Getting Started:</small>
+          <p style="margin-left:50px;">
+            Step 1: 
+            <span class=" text-danger">
+              <strong>Add Truck</strong>
+            </span>
+            <br/>
+            Step 2: 
+            <span class=" text-danger">
+              <strong>Add Customer</strong>
+            </span>
+            <br/><br/><br/><br/>
+          </p>
+          <small>Main Features:</small><br/>
+          <span class=" text-primary" style="margin-left:50px;">
+            <strong>Create Order</strong>
+          </span>
+          
+          <span class=" text-primary" style="margin-left:50px;">
+            <strong>View/Update Orders</strong>
+          </span>
+          
+          <span class=" text-primary" style="margin-left:50px;">
+            <strong>View Schedule</strong>
+          </span>
+        </div>
+
         <TheOrders id="orders" 
+        v-if="orders.length"
         :orders="page_orders"
         :page="page"
         :perPage="perPage"
