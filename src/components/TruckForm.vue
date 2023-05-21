@@ -9,26 +9,26 @@
               <div class="form-group">
                 <div class="form-group">
                   <label for="license_plate">License Plate No.</label>
-                  <input v-model:license_plate="license_plate" type="text" name="license_plate" id="license_plate" cols="30" rows="2" class="form-control" maxlength="75" required>
+                  <input type="text" name="license_plate" id="license_plate" cols="30" rows="2" class="form-control" maxlength="75" required>
                 </div>
                 <div class="form-group">
-                  <label for="capacity">Compartments (text i.e. 80,20,50,40)</label>
-                  <input v-model:capacity="capacity" type="text" name="capacity" id="capacity" cols="30" rows="2" class="form-control" maxlength="75" required>
+                  <label for="capacity">Compartments &nbsp;<small style="font-size:10px;">( i.e. 80,20,50,40 )</small></label>
+                  <input type="text" name="capacity" id="capacity" cols="30" rows="2" class="form-control" maxlength="75" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="model">Make</label>
-                    <input v-model:value="model" type="text" name="model" id="model" cols="30" rows="2" class="form-control" maxlength="75" required>
+                    <label for="model">Model</label>
+                    <input type="text" name="model" id="model" cols="30" rows="2" class="form-control" maxlength="75" required>
                 </div>
                 <div class="form-group">
                     <label for="make">Make</label>
-                    <input v-model:value="make" type="text" name="make" id="make" cols="30" rows="2" class="form-control" maxlength="75" required>
+                    <input type="text" name="make" id="make" cols="30" rows="2" class="form-control" maxlength="75" required>
                 </div>
                 <div class="form-group">
                   <label for="year">Year</label>
-                  <input v-model:value="year" type="number" name="year" id="year" cols="30" rows="2" class="form-control" maxlength="75" required>
+                  <input type="number" name="year" id="year" cols="30" rows="2" class="form-control" maxlength="75" required>
                 </div>
-                <input name="active" id="active" type="number" value="1" hidden>
+                <input name="active" id="active" type="number" value="1" hidden> 
             </div>
           </form>
       </div>
@@ -59,17 +59,16 @@
 <script setup lang='ts'>
 
     import { ref, onMounted } from 'vue';
+
+    const emit = defineEmits<{
+        (event:'close'):void
+    }>()
     
     let id  = Number(localStorage['id']);
     let role = 'admin';
     
     let url = `/api/v1/trucks`;
-    
-    let license_plate = ref("");
-    let capacity = ref("");
-    let year = ref(0);
-    let make = ref("90");
-    let model = ref("");
+
 
     function addTruck() {
         let error_highlight = 'rgb(175, 95, 95)';
@@ -78,7 +77,7 @@
             console.log("Create Truck function called");
             console.log($('form#createTruckForm')[0]);
 
-            fetch("/api/v1/orders", {
+            fetch(url, {
                 method: 'POST',
                 headers: {},
                 body: new FormData($('form#createTruckForm')[0])
@@ -88,32 +87,33 @@
             })
             .then((data)=>{
                 if (data.status == "success") {
-                    console.log("Truck created successfully");
-                    alert("order created successfully");
+                    console.log("Truck added successfully");
+                    alert("Truck added successfully");
                     console.log(data);
                 } else {
                     console.log(data);
                 }
+                emit('close');
             });
         } else {
             alert("Form is invalid.");
-            if (license_plate.value==""){
+            if ($('#license_plate').val()==""){
                 $('#license_plate').css({'background-color':error_highlight});
                 $('#license_plate').css({'font-weight':error_weight});
             }
-            if (capacity.value==""){
+            if ($('#capacity').val()==""){
                 $('#capacity').css({'background-color':error_highlight});
                 $('#capacity').css({'font-weight':error_weight});
             }
-            if (year.value==0){
+            if ($('#year').val()==0){
                 $('#year').css({'background-color':error_highlight});
                 $('#year').css({'font-weight':error_weight});
             }
-            if (make.value==""){
+            if ($('#make').val()==""){
                 $('#make').css({'background-color':error_highlight});
                 $('#make').css({'font-weight':error_weight});
             }
-            if (model.value==""){
+            if ($('#model').val()==""){
                 $('#model').css({'background-color':error_highlight});
                 $('#model').css({'font-weight':error_weight});
             }
@@ -134,12 +134,11 @@
 
 
     function clear() {
-        license_plate.value = "";
-        capacity.value = "";
-        year = 0;
-        active.value = 1;
-        make.value = "";
-        model.value = ""
+        $('#license_plate').val("");
+        $('#capacity').val("");
+        $('#model').val("");
+        $('#make').val("");
+        $('#year').val(0);
     }
 
 </script>

@@ -2,7 +2,8 @@
   import { ref, onMounted } from 'vue'
   import OrderForm from '../components/OrderForm.vue'
   import TheOrders from '../components/TheOrders.vue'
-  import TheSchedule from '../components/TheOrders.vue'
+  // import TheSchedule from '../components/TheSchedule.vue'
+  import TruckForm from '../components/TruckForm.vue'
   import TheRegister from '../components/TheRegister.vue'
   
   let id:number  = Number(localStorage['id']);
