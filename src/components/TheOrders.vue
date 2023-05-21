@@ -1,127 +1,173 @@
 <template>
-    <!-- <div id="component" class="container">
-        <div class="card">
-            <div class="card-header">
-                <div class="profile_pic flex-start">
-                    <img class="" :src="`../../uploads/${post.profile_photo}`" alt="profile_pic">
-                    
-                    <a :href="`/users/${post.user_id}`">{{ post.username }}</a>
-                </div>
-            </div>
-            <div class="card-image">
-                <img class="" :src="`../../uploads/${post.photo}`" alt="post image">
-            </div>
-            <div class="card-body">
-                <p class="card-text">
-                    {{ post.caption }}
-                </p>
-            </div>
-            <div class="container footer">
-                <span class="likes float-left">
-                    <img v-if="post.liked" class="full" src="../components/icons/full_heart.png" alt="like post" @click="unlike(post.id)" />
-                    <img v-else class="empty" src="../components/icons/empty_heart.png" alt="unliked post" @click="like(post.id)" />
-                    <small>{{ post.likes }} likes</small>
-                </span>
-                <span class="date float-right">
-                    <small>{{ post.created_on }}</small>
-                </span>
-            </div>
-        </div>
-    </div> -->
+    <div class="table">
+        <h1>Orders</h1>
+        <table class="table-striped table-bordered table-hover">
+            <thead>
+                <th>ID</th>
+                <th>Customer</th>
+                <!-- <th>Parish</th> -->
+                <th>Date</th>
+                <th>Time</th>
+                <!-- <th>Total</th> -->
+                <th>87</th>
+                <th>90</th>
+                <th>Diesel</th>
+                <th>ULSD</th>
+                <th>status</th>
+                <th>Actions</th>
+            </thead>
+            <tbody>
+                <tr :id="order['orderID']" v-for="(order, index) in orders" 
+                    :order="order"
+                    :key="index"> 
+                    <td>{{ order['orderID'] }}</td>
+                    <td>{{ order['customerName'] }}</td>
+                    <!-- <td>{{ order['parish'] }}</td> -->
+                    <td>{{ (order['deliveryDate']) }}</td>
+                    <td>{{ order['deliveryTime'] }}</td>
+                    <!-- <td>{{ order['orderQuantity'] }}</td> -->
+                    <td>{{ order['q_87'] }}</td>
+                    <td>{{ order['q_90'] }}</td>
+                    <td>{{ order['q_diesel'] }}</td>
+                    <td>{{ order['q_ulsd'] }}</td>
+                    <td><select name="status" id="status">
+                        <option value="" disabled></option>
+                        <option :value="order['status']" selected>{{ order['status'] }}</option>
+                        <option value="pending" v-if="order['status']!=='Pending' && order['status']!=='Delivered'">Pending</option>
+                        <option value="ready" v-if="order['status']!=='Ready' && order.status!=='Delivered'">Processing</option>
+                        <option value="preparing" v-if="order['status']!=='Preparing' && order['status']!=='Delivered'">Preparing</option>
+                        <option value="delivering" v-if="order['status']!=='Pending' && order['status']!=='Delivering' && order['status']!=='Delivered'">Out for Delivery</option>
+                        <option value="delivered" v-if="order['status']!=='Pending' && order['status']!=='Processing' && order['status']!=='Delivered'">Delivered</option>
+                    </select></td>
+                    <td :id="order['orderID']+`_actions`">
+                        <div class="action_button btn btn-primary" @click="view(order['orderID'])"> View</div>
+                        <div class="action_button btn btn-primary" @click="update(order['orderID'])"> Update</div>
+                        <div class="action_button btn btn-dark" @click="cancel(order['orderID'])"> Cancel</div>
+                    </td> 
+                </tr>
+            </tbody>
+        </table>
+        <nav aria-label="Page navigation">
+          <ul class="pagination justify-content-center">
+
+            <li v-if="page>1" class="page-item page-link" @click="back" aria-label="Previous">
+                <span aria-hidden="true">&laquo;</span>
+                <span class="sr-only">Previous</span>
+              
+            </li>
+
+            <li v-if="page>1" class="page-item page-link" @click="back"><span>{{ page - 1 }}</span></li>
+            <li class="page-item active"><strong>&nbsp;&nbsp;&nbsp;{{ page }}&nbsp;&nbsp;&nbsp;</strong></li>
+            <li v-if="page<final_page" class="page-item page-link" @click="next"><span>{{ page + 1 }}</span></li>
+            
+            <li class="page-item page-link"
+                v-if="page<final_page"
+                @click="next" 
+                aria-label="Next">
+                <span aria-hidden="true">&raquo;</span>
+                <span class="sr-only">Next</span>
+            </li>
+
+          </ul>
+        </nav>
+    </div>
 
 </template>
 
+
 <script setup lang="ts">
+    // import { ref, onMounted } from 'vue'
 
-    // let props = defineProps(['post']);
-    // let emit = defineEmits<{
-    //     (event: 'like', index: number): void
-    //     (event: 'unlike', index: number): void
-    // }>();
+    const prop = defineProps(['orders', 'page', 'perPage', 'final_page']);
+    const emit = defineEmits<{
+        (event:'view', id:number): void;
+        (event:'update', id:number, status:string): void;
+        (event:'cancel', id:number): void;
+        (event:'updatePage', page:number): void;
+    }>();
 
-    // function like(index:number) {
-    //     emit('like',index);
-    // }
+    // onMounted(() => {
+        
+    // })
 
-    // function unlike(index:number) {
-    //     emit('unlike', index);
-    // }
+    function back() {
+        let prev = prop.page-1;
+        emit('updatePage', prev);
+        // location.reload();
+    }
 
+    function next() {
+        let nex = prop.page+1;
+        emit('updatePage', nex);
+        // location.reload();
+    }
+
+    function update(id:number, status:string){
+        emit('update', id, status);
+    }
+
+    function cancel(id:number){
+        emit('cancel', id);
+    }
+
+    function view(id:number){
+        emit('view', id);
+    }
 </script>
+
 
 <style scoped>
 
-    #component {
-        min-width: 100%;
-    }
+  input[type="file"] {
+    width: 110px;
+    border: none;
+    background-color: none;
+  }
 
-    .card {
-        max-width:400px;
-        height:450px;
-        
-        margin-bottom:25px;
-    }
+  .active {
+    margin-top:6px;
+  }
 
-    .card-header {
-        height:fit-content;
-        background-color: white;
-        border:none;
-    }
+  li:hover{
+    cursor:pointer;
+  }
 
-    .profile_pic img {
-        width:28px;
-        margin-right:8px;
-        border-radius:50%;
-    }
+  .action_button {
+    width:75px;
+    margin-bottom:10px;
+  }
 
-    .likes img {
-        position:absolute;
-        width:24px;
-        padding-right:10px;
-    }
+  .table {
+    width:690px;
+  }
 
-    .likes .empty:hover {
-        width:26px;
-        /* padding-right:8px; */
-    }
-    
-    .likes small {
-        position:absolute;
-        left:35px;
-    }
+  thead {
+    background-color:rgb(89, 89, 152);
+    color:aliceblue;
+  }
+  .btn-close {
+    border-width: 0;
+    border-color: rgb(182, 98, 98);
+    border-radius: 5px;
+    background-color: rgb(182, 98, 98);
+    color: rgb(64, 64, 64);
+    font-weight: 600;
+    font-family: monospace;
+    margin-top:2px;
+    margin-right:2px
+  }
 
-    .date:hover, .likes:hover {
-        color:gray;
-    }
-    
-    .card-image, .card-image img {
-        width:100%;
-        height:250px;
-    }
+  .btn-close:hover {
+    font-weight:800;
+    border-color: brown;
+    background-color: red;
+    color:white;
+    box-shadow: 1px 1px 3px black;
+  }
 
-    .card-body {
-        height: 100%;
-    }
-
-    .card-text {
-        height: 100%;
-        margin-bottom:50px;
-    }
-
-    .footer {
-        padding-bottom:10px;
-        cursor:default;
-    }
-
-    .footer small {
-        margin-left: 15px;
-    }
-
-    .footer, .profile_pic {
-        font-size: smaller;
-        color:rgb(102, 102, 102);
-        font-weight:700;
-        font-family:system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif
-    }
-
+  #save {
+    width: 16px;
+    margin-right:6px;
+    margin-bottom:4px;
+  }
 </style>

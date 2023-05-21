@@ -198,38 +198,52 @@ class Truck(db.Model):
         
         # This is the priority Truck
         # Get the sizes of all its of its compartments
-        comps = self.get_compartments()
-        comp_id_list = [x.id for x in comps]
+        comps = self.available_compartments(date, time)
         comp_cap_list = [x.capacity for x in comps]
-        total = sum([x.capacity for x in comps])
+        
+        try:
+            # get the available compartments of the existing delivery truck for later update
+            delivery = db.session.query(Delivery).filter((Delivery.date==date) & (Delivery.time==time) & (Delivery.truck_id==comps[0].truck_id) & Delivery.available>0).first()
+            if delivery is None:
+                delivery = Delivery(order_id,petrol,date,time,self.id,parish,0,self.capacity)
+                db.session.add(delivery)
+                db.session.commit()
+                db.session.refresh(delivery)
+        except Exception as e:
+            print(e)
+        
+        goal = min(qty, delivery.available)
         # call the permutation function
-        perms_tuple = self.permutations(qty, comp_cap_list)
+        perms_tuple = self.permutations(goal, comp_cap_list)
+        
         amount = perms_tuple[0]
         if amount != 0:
             try:
                 order = db.session.query(Order).filter_by(id=order_id).scalar()
                 val, nest = perms_tuple
-                delivery = Delivery(order_id, petrol, date, time, self.id, parish, amount, total-amount)
-                db.session.add(delivery)
-                # db.session.flush()
-                db.session.commit()
-                db.session.refresh(delivery)
-                for v in nest:    
-                    if val:
-                        size = v
-                        comp = [x for x in comps if x.capacity==size][0]
-                        delivery_comp = DeliveryCompartment(delivery.id, order_id, comp.id, parish, petrol, self.capacity)
-                        db.session.add(delivery_comp)
-                        match petrol:
-                            # update the specific fuel type quantity
-                            case "diesel":
-                                order.q_diesel += v
-                            case "87":
-                                order.q_87 += v
-                            case "90":
-                                order.q_90 += v
-                            case "ulsd":
-                                order.q_ulsd += v
+                
+                if val:
+                    for v in nest:    
+                        comp = [x for x in comps if x.capacity==v][0]
+                        
+                        if delivery.available >= v:
+                            # update delivery
+                            delivery.available -= v
+                            delivery.filled += v
+                            
+                            delivery_comp = DeliveryCompartment(delivery.id, order_id, comp.id, parish, petrol, comp.capacity)
+                            db.session.add(delivery_comp)
+                            match petrol:
+                                # update the specific fuel type quantity
+                                case "diesel":
+                                    order.q_diesel += v
+                                case "87":
+                                    order.q_87 += v
+                                case "90":
+                                    order.q_90 += v
+                                case "ulsd":
+                                    order.q_ulsd += v
+                
                 # update the total order quantity
                 order.quantity += val
                 db.session.commit()
@@ -250,14 +264,20 @@ class Truck(db.Model):
     def get_compartments(self):
         return [x for x in db.session.query(Compartment).filter_by(truck_id=self.id).all()]
     
-    def available(self):
-        delivery = db.session.query(Delivery).filter_by(truck_id=self.id).first()
+    def available(self, date, time):
+        delivery = db.session.query(Delivery).filter((Delivery.truck_id==self.id) & (Delivery.date==date) & (Delivery.time==time)).first()
         if not delivery:
             return self.capacity
-        return self.capacity - delivery.available
+        space = self.capacity - delivery.available
+        if space < 0:
+            return 0
+        return space
     
-    def available_compartments(self):
-        fc = db.session.query(DeliveryCompartment).join(Compartment, Compartment.id==DeliveryCompartment.compartment_id).filter(Compartment.truck_id==self.id).all()
+    def available_compartments(self, date, time):
+        # fc is filled or already booked compartments
+        fc = db.session.query(DeliveryCompartment).join(Compartment, Compartment.id==DeliveryCompartment.compartment_id)\
+            .join(Delivery, Delivery.id==DeliveryCompartment.delivery_id)\
+        .filter((Compartment.truck_id==self.id) & (Delivery.date==date) & (Delivery.time==time)).all()
         filled_compartments = [x.compartment_id for x in fc]
         available_comps = db.session.query(Compartment).filter((Compartment.truck_id==self.id) & (~Compartment.id.in_(tuple(filled_compartments)))).all()
         return available_comps
@@ -265,11 +285,11 @@ class Truck(db.Model):
     def fill_all(self, order_id, qty, petrol, parish, date, time):
         created = False
         temp = 0
-        if self.available() == self.capacity:
+        if self.available(date, time) == self.capacity:
             try:
                 order = db.session.query(Order).filter_by(id=order_id).scalar()
                 # create a delivery
-                delivery = Delivery(order_id, petrol, date, time, self.id, parish, self.capacity, 0)
+                delivery = Delivery(order_id, petrol, date, time, self.id, parish, 0, self.capacity)
                 db.session.add(delivery)
                 db.session.commit()
                 created = True
@@ -280,7 +300,7 @@ class Truck(db.Model):
                     if temp + comp.capacity <= qty:
                         # fill all compartments of this truck
                         temp += comp.capacity
-                        comp = DeliveryCompartment( delivery.id, order_id, comp.id, parish, petrol, temp)
+                        comp = DeliveryCompartment( delivery.id, order_id, comp.id, parish, petrol, comp.capacity)
                         db.session.add(comp)
                 match petrol:
                     # update the specific fuel type quantity
@@ -294,6 +314,8 @@ class Truck(db.Model):
                         order.q_ulsd += temp
                 # update the total order quantity
                 order.quantity += temp
+                delivery.filled += temp
+                delivery.available -= temp
                 db.session.commit()
             except Exception as e:
                 created = False
@@ -303,8 +325,8 @@ class Truck(db.Model):
                     db.session.delete(delivery)
                     db.session.commit()
                     db.session.rollback()
-        elif self.available() > 0:
-            self.fill_each(order_id, self.available(), petrol, date, time, parish)
+        elif self.available(date, time) > 0:
+            self.fill_each(order_id, self.available(date, time), petrol, date, time, parish)
             
         return temp
 

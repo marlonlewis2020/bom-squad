@@ -1,6 +1,8 @@
 <template>
     <main>
-        <TheRegister #default/>
+        <div class="container col-sm-6">
+            <TheRegister />
+        </div>
     </main>
 </template>
 

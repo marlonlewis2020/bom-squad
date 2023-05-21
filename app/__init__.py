@@ -25,3 +25,17 @@ from app import models
 
 with app.app_context():
     db.create_all()
+    
+    # insert areas
+    areas_loaded = db.session.query(models.Area).count()
+    if not areas_loaded:
+        with open("Areas.csv","r") as areas:
+            rows = [area.split(",") for area in areas]
+            
+        for nbrs in rows:
+            print(nbrs[0], nbrs[1])
+            area = models.Area(nbrs[0], nbrs[1])
+        print(len(rows))
+        db.session.add(area)
+        db.session.commit()
+    

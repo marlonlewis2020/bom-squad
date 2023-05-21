@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import MySQLdb
 from flask_login import current_user, login_user, logout_user, login_required
+from sqlalchemy import desc
 from app import app, db, LOCKED, PEND, login_manager
 from flask import Flask, jsonify, request, session, make_response
 
@@ -10,8 +11,7 @@ from .forms import CustomerForm, AddressForm, OrderForm, UserForm, TruckForm, Lo
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.utils.utils import format_date, sql_date, strtodate
 from queue import Queue
-# from app.utils.support.Graph import Graph
-from app.utils.support.G import Graph
+from app.utils.support.Graph import Graph
 import jwt
 
 ACTIVE = {}
@@ -41,12 +41,12 @@ def login():
             user = User.query.filter_by(username=username).first()
             print(user)
             if user is not None and check_password_hash(user.password, password):
-                payload = {'sub': user.id, "iat":timestamp, "exp": expiry_date}
+                payload = {'sub': user.id, 'role': user.role, 'is_active':user.is_active, "iat":timestamp, "exp": expiry_date}
                 
                 token = jwt.encode(payload, app.config['SECRET_KEY'], algorithm = 'HS256')
                 if login_user(user):
                     load_user(user.id)
-                return jsonify(status='success', message = 'User successfully logged in.', id=user.id, token=token)
+                return jsonify(status='success', message = 'User successfully logged in.', id=user.id, role=user.role, token=token)
             return jsonify(errors="Invalid username or password")
         except Exception as e:
             print(e)
@@ -90,7 +90,57 @@ def generate_token():
 
 # -- CUSTOMER END POINTS -- 
 
-@app.route('/api/v1/customers/<id>', methods=['GET','PUT'])
+@app.route('/api/v1/customers/all', methods=['GET'])
+def get_customers():
+    """ Gets or updates a customer's details """
+    # get customer or updates customer by id
+    if request.method == 'GET':
+        # GET THE ORDER DETAILS
+        ''' VIEW RETURN EXAMPLE BELOW:
+        {
+            status: "success",
+            data: {
+                customerID: "00000001",
+                company:"Total",
+                branch:"Barbican",
+                phoneNumber:"(876)-555-0555",
+                email:"totalbarbican@gmail.com",
+                purchasingOfficer:"Robert Desnoes",
+                location:"12 Barbican Road, Barbican, St. Andrew, Ja.",
+            }
+        }
+        '''
+        response = {
+            'status':'error',
+        }
+        try:
+            customers = db.session.query(Customer).all()
+                # .add_column(Customer.id, Customer.company, Customer.branch, Customer.officer, User.contact_number, User.email, Address.address_line_1, Address.city, Address.parish, Address.country)\
+            
+            if customers is not None:  
+                data = []
+                for customer in customers:
+                    location = db.session.query(Address).filter_by(id=customer.address_id).scalar() 
+                    address = "{} {}, {}, {}, {}".format(location.address_line_1, location.city, location.parish, location.country, location.postal_code)
+                    data.append({
+                        'customer_id':customer.id,
+                        'company':customer.company,
+                        'branch':customer.branch,
+                        'contact_number':customer.contact_number,
+                        'email':customer.email,
+                        'officer':customer.officer,
+                        'location':address,
+                        'address_id':location.id,
+                    })
+                response['status'] = 'success'
+                response['data'] = data
+        except Exception as e:
+            print(e)
+            response['message']='Something went wrong!'
+        
+        return make_response(response)
+
+@app.route('/api/v1/customers/<int:id>', methods=['GET','PUT'])
 # @login_required
 def customer(id):
     """ Gets or updates a customer's details """
@@ -304,7 +354,8 @@ def order(id):
                 customerName:"Total Barbican",
                 address:"12 Barbican Road, Barbican, St. Andrew, Jamaica",
                 deliveryDate:"2023-04-30",
-                deliveryTime:"12:00 PM"
+                deliveryTime:"12:00 PM",
+                status:"Pending"
             }    
         }
         '''
@@ -404,6 +455,7 @@ def orders():
                 & (Customer.address_id==Address.id)\
                 & (Order.status != "Cancelled")\
                 & (Order.status != "Deleted"))\
+                .order_by(desc(Order.id))\
                 .all()
             for o in orders:
                 response['data'].append(Order.to_json(o.Order, o.User.name, '{} {}, {}, {}, {}'.format(o.Address.address_line_1, o.Address.city, o.Address.parish, o.Address.country, o.Address.postal_code)))
@@ -487,10 +539,10 @@ def orders():
             
             """ Perform critical operations """
             address = db.session.query(Address).filter_by(id=int(form.location.data)).first()
-            q_diesel_order = Graph(order.id, address.parish, "diesel", qd, d_date, d_time, 10)
-            q_87_order = Graph(order.id, address.parish, "87", q87, d_date, d_time, 10)
-            q_90_order = Graph(order.id, address.parish, "90", q90, d_date, d_time, 10)
-            q_ulsd_order = Graph(order.id, address.parish, "ulsd", qul, d_date, d_time, 10)
+            q_diesel_order = Graph(cid, order.id, address.parish, "diesel", qd, d_date, d_time, 10)
+            q_87_order = Graph(cid, order.id, address.parish, "87", q87, d_date, d_time, 10)
+            q_90_order = Graph(cid, order.id, address.parish, "90", q90, d_date, d_time, 10)
+            q_ulsd_order = Graph(cid, order.id, address.parish, "ulsd", qul, d_date, d_time, 10)
             total_order = {
                 "q_diesel_order" : q_diesel_order,
                 "q_87_order" : q_87_order,
@@ -502,7 +554,7 @@ def orders():
             prioritized_order = BinaryHeap()
             i_orders = total_order.keys()
             total_left = 0
-            for gas in i_orders:
+            for gas in i_orders: # insert into priority queue
                 sub_order = total_order[gas]
                 if gas == preferred:
                     prioritized_order.heap_insert((0, sub_order))
@@ -514,18 +566,14 @@ def orders():
                 if sub_order.QTY > 0:
                     result = sub_order.fill_trucks()
                     total_left += result[0]
-                    balance[gas]={
+                    balance[f"q_{sub_order.petrol}_order"]={
                         "ordered":sub_order.O_QTY,
                         "filled":sub_order.O_QTY-result[0],
                     }
-                    
-                    if str(gas.split("_")[1]).strip() == form.preferred.data.strip():
-                        balance[gas]["upgrades"]=result[1]
             
             # get the filled qtys and update order qty's accordingly
             # update the balance variable with the upgrade balance
     
-            
             # update the existing order using order object
             
             # release lock
@@ -540,11 +588,17 @@ def orders():
                 "order_filled":q-total_left,
                 "options":balance
             }
-            if q==total_left:
+            if order.quantity == 0:
+                db.session.delete(order)
+                db.session.commit()
+                response['status'] = "invalid"
+                response['message'] = "order is invalid"
+                
+            if q > 0 and q==total_left:
                 # order cannot be filled. No trucks are available for the date
                 db.session.delete(order)
                 db.session.commit()
-                response["status"] = "error"
+                response["status"] = "unavailable"
                 response["message"] = "unable to fulfill order at this time. Please try a different date."
             else:
                 for gas in i_orders:
@@ -553,6 +607,9 @@ def orders():
                         if not fill_order.upgrade_pq.empty():
                             ug = fill_order.upgrade_pq.pop()
                             lock_truck(order.id, ug, gas)
+                            balance[gas]["upgrades"]=[x.capacity for x in ug.available_compartments(fill_order.delivery_date, fill_order.delivery_time)]
+                        else:
+                            balance[gas]["upgrades"]=[]
         except MySQLdb.OperationalError as ope:
             print(ope)
         
@@ -574,7 +631,7 @@ def orders():
         
     return make_response(response)
 
-@app.route('/api/v1/orders/<id>', methods=['POST'])
+@app.route('/api/v1/orders/<int:id>', methods=['POST'])
 # @login_required
 def confirm_order(id):
     """Confirm a pending order"""
@@ -594,13 +651,16 @@ def confirm_order(id):
                     for i, gas in enumerate(gases):
                         # get amount to upgrade this gas type by from the response and update the compartment
                         amount = int(request.form.get(gas.split("_order")[0]))
-                        comps = truck.available_compartments()
+                        comps = truck.available_compartments(format_date(order.delivery_date), order.delivery_time)
                         
                         for comp in comps:
                             # fill all compartments of this truck
                             if comp.capacity == amount:
-                                delivery = db.session.query(DeliveryCompartment).filter_by(truck_id=truck_id).first()
-                                comp = DeliveryCompartment( delivery.id, id, comp.id, truck_id, gas, comp.capacity)
+                                # update delivery
+                                # fill delivery compartment
+                                delivery_comp = db.session.query(Delivery).filter_by(truck_id=truck_id).first()
+                                
+                                comp = DeliveryCompartment( delivery_comp.id, id, comp.id, truck_id, gas, comp.capacity)
                                 db.session.add(comp)
                         match gas:
                             # update the specific fuel type quantity
