@@ -179,6 +179,7 @@
                     emit('refresh');
                 } else {
                     console.log(data);
+                    emit('refresh');
                 }
             });
         } else {

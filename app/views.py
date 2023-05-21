@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import MySQLdb
 from flask_login import current_user, login_user, logout_user, login_required
+from sqlalchemy import desc
 from app import app, db, LOCKED, PEND, login_manager
 from flask import Flask, jsonify, request, session, make_response
 
@@ -454,6 +455,7 @@ def orders():
                 & (Customer.address_id==Address.id)\
                 & (Order.status != "Cancelled")\
                 & (Order.status != "Deleted"))\
+                .order_by(desc(Order.id))\
                 .all()
             for o in orders:
                 response['data'].append(Order.to_json(o.Order, o.User.name, '{} {}, {}, {}, {}'.format(o.Address.address_line_1, o.Address.city, o.Address.parish, o.Address.country, o.Address.postal_code)))
@@ -537,10 +539,10 @@ def orders():
             
             """ Perform critical operations """
             address = db.session.query(Address).filter_by(id=int(form.location.data)).first()
-            q_diesel_order = Graph(order.id, address.parish, "diesel", qd, d_date, d_time, 10)
-            q_87_order = Graph(order.id, address.parish, "87", q87, d_date, d_time, 10)
-            q_90_order = Graph(order.id, address.parish, "90", q90, d_date, d_time, 10)
-            q_ulsd_order = Graph(order.id, address.parish, "ulsd", qul, d_date, d_time, 10)
+            q_diesel_order = Graph(cid, order.id, address.parish, "diesel", qd, d_date, d_time, 10)
+            q_87_order = Graph(cid, order.id, address.parish, "87", q87, d_date, d_time, 10)
+            q_90_order = Graph(cid, order.id, address.parish, "90", q90, d_date, d_time, 10)
+            q_ulsd_order = Graph(cid, order.id, address.parish, "ulsd", qul, d_date, d_time, 10)
             total_order = {
                 "q_diesel_order" : q_diesel_order,
                 "q_87_order" : q_87_order,
@@ -552,7 +554,7 @@ def orders():
             prioritized_order = BinaryHeap()
             i_orders = total_order.keys()
             total_left = 0
-            for gas in i_orders:
+            for gas in i_orders: # insert into priority queue
                 sub_order = total_order[gas]
                 if gas == preferred:
                     prioritized_order.heap_insert((0, sub_order))
@@ -601,7 +603,7 @@ def orders():
                         if not fill_order.upgrade_pq.empty():
                             ug = fill_order.upgrade_pq.pop()
                             lock_truck(order.id, ug, gas)
-                            balance[gas]["upgrades"]=[x.capacity for x in ug.available_compartments()]
+                            balance[gas]["upgrades"]=[x.capacity for x in ug.available_compartments(fill_order.delivery_date, fill_order.delivery_time)]
                         else:
                             balance[gas]["upgrades"]=[]
         except MySQLdb.OperationalError as ope:
@@ -645,7 +647,7 @@ def confirm_order(id):
                     for i, gas in enumerate(gases):
                         # get amount to upgrade this gas type by from the response and update the compartment
                         amount = int(request.form.get(gas.split("_order")[0]))
-                        comps = truck.available_compartments()
+                        comps = truck.available_compartments(format_date(order.delivery_date), order.delivery_time)
                         
                         for comp in comps:
                             # fill all compartments of this truck

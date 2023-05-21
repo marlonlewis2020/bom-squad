@@ -14,10 +14,11 @@ class Graph:
     available_trucks = []
     INF = float("Inf")
 
-    def __init__(self, order, start_node, petrol, ord_qty, date, time, depth):
+    def __init__(self, customer_id, order, start_node, petrol, ord_qty, date, time, depth):
         """Graph Constructor
         """
         self.upgrade_pq = PQ() 
+        self.customer_id = customer_id
         self.order_id = order
         self.petrol = petrol
         self.DEPTH = {}
@@ -44,6 +45,11 @@ class Graph:
         self.discovered = Queue()
         self.visited = []
         
+    def get_this_date_time_deliveries(self):
+        deliveries = db.session.query(Delivery).distinct()\
+            .join(DeliveryCompartment, DeliveryCompartment.delivery_id==Delivery.id)\
+            .filter((Delivery.date==self.delivery_date) & (Delivery.time==self.delivery_time)).all()
+        return deliveries
         
     def load_area_nodes2(self):
         booked_ids = set()
@@ -72,7 +78,7 @@ class Graph:
             # print(self.local_map.items())
                         
             # 2.2 load area - booked trucks
-            deliveries = db.session.query(Delivery).distinct()\
+            deliveries = db.session.query(Delivery)\
             .join(DeliveryCompartment, DeliveryCompartment.delivery_id==Delivery.id)\
             .filter((Delivery.date==self.delivery_date) & (Delivery.time==self.delivery_time)
                 & (DeliveryCompartment.parish==parish)).all()
@@ -114,7 +120,28 @@ class Graph:
     def fill_trucks(self):
         # get the available and booked trucks from db
         self.load_area_nodes2()
-        #
+        
+        # Are there existing delivery trucks for this customer/area that has available space to carry some of the order balance?
+        d_prevs = db.session.query(Delivery).join(DeliveryCompartment, DeliveryCompartment.delivery_id==Delivery.id)\
+            .join(Order, Order.id==DeliveryCompartment.order_id)\
+            .filter((Order.status!="Delivering") & (Order.status!="Delivered") & (Order.customer_id==self.customer_id)
+                & (Delivery.date==self.delivery_date) & (Delivery.time==self.delivery_time) & (DeliveryCompartment.parish==self.start_node)).all()
+        # cycle = 0    
+        if d_prevs:
+            customer_other_orders = PQ()
+            for deliv in d_prevs:
+                if deliv.available>0 and self.QTY>=deliv.available:
+                    pri = abs(self.QTY-deliv.available)
+                    customer_other_orders.heap_insert((pri, deliv))
+            while not customer_other_orders.empty():
+                # if cycle >= 1: break
+                d = customer_other_orders.pop()
+                if d and self.QTY >= d.available:
+                    t = db.session.query(Truck).filter_by(id=d.truck_id).scalar()
+                    self.QTY = t.fill_each(self.order_id, self.QTY, self.petrol, self.delivery_date, self.delivery_time, self.start_node)
+                    # cycle += 1
+                
+        
         # greedily fill order with available trucks
         # if order qty >= popped truck below
         truck = self.available_trucks.pop()
@@ -134,7 +161,7 @@ class Graph:
             if pq.empty():
                 pq = []
             else:
-                ac = pq.pop().available_compartments()
+                ac = pq.pop().available_compartments(self.delivery_date, self.delivery_time)
                 pq = [x.capacity for x in ac]
         return (self.QTY, pq)
     
@@ -158,45 +185,53 @@ class Graph:
             a_trucks = list(self.AREAS[a]['trucks'])
             # just throw them into the queue by available space
             for truck in a_trucks:
-                priority_pq.heap_insert((-truck.available(), truck))
+                priority_pq.heap_insert((-truck.available(self.delivery_date, self.delivery_time), truck))
         while not priority_pq.empty():
             b_truck = priority_pq.pop() # fill the remaining balance
-            if b_truck and self.QTY >= b_truck.available():
+            if b_truck and self.QTY >= b_truck.available(self.delivery_date, self.delivery_time):
                 # fill order
                 self.QTY = b_truck.fill_each(self.order_id, self.QTY, self.petrol, self.delivery_date, self.delivery_time, self.start_node)
                 db.session.commit()
-                if b_truck.available() > 0 and b_truck not in truck_list: truck_list.append(b_truck)
+                if b_truck.available(self.delivery_date, self.delivery_time) > 0 and self.QTY>0 and b_truck not in truck_list: 
+                    truck_list.append(b_truck)
         
         # add remaining trucks into upgrade queue
         # FILL THE COMPARTMENTS OF THE AVAILABLE TRUCKS CLOSEST IN SIZE TO THE ORDER SIZE
         if not self.available_trucks.empty() and self.QTY > 0:
             truck = self.available_trucks.pop()
-            if truck:
+            if truck and truck.available(self.delivery_date, self.delivery_time):
                 db.session.rollback()
                 db.session.flush()
-                # existing_delivery
-                # find delivery truck with same order number that has available space.case
-                # If the available space is closer than the selected truck then use it.
+                # check for existing_delivery
+                # find existing delivery truck with same order number that has available space.
                 et = db.session.query(Delivery).join(DeliveryCompartment, Delivery.id==DeliveryCompartment.delivery_id)\
-                    .filter((DeliveryCompartment.order_id==self.order_id) & (Delivery.available>0)).first()
-                if et and et.available < truck.available():
+                    .filter((DeliveryCompartment.order_id==self.order_id) & (Delivery.date==self.delivery_date) & (Delivery.time==self.delivery_time) &(Delivery.available>0)).first()
+                    
+                # If the available space of existing delivery truck is smaller than the selected truck then choose the smaller for efficient use of resources (use the existing delivery truck).
+                if et and et.available and et.available < truck.available(self.delivery_date, self.delivery_time):
+                    truck_list.append(truck) # the larger truck is a possible truck to suggest as an upgrade later
                     truck = db.session.query(Truck).filter_by(id=et.truck_id).scalar()
                     self.QTY = truck.fill_each(self.order_id, self.QTY, self.petrol, self.delivery_date, self.delivery_time, self.start_node)
+                    if truck.available(self.delivery_date, self.delivery_time) > 0 and self.QTY>0 and truck not in truck_list: 
+                        truck_list.append(truck)
                 else:
-                    if self.QTY < truck.available():
+                    if self.QTY < truck.available(self.delivery_date, self.delivery_time):
                         self.QTY = truck.fill_each(self.order_id, self.QTY, self.petrol, self.delivery_date, self.delivery_time, self.start_node)
+                        if truck.available(self.delivery_date, self.delivery_time) > 0 and self.QTY>0 and truck not in truck_list: 
+                            truck_list.append(truck)
                     else:
                         self.QTY -= truck.fill_all(self.order_id, self.QTY, self.petrol, self.start_node, self.delivery_date, self.delivery_time)
                 
                 if self.QTY > 0:
-                    pri = abs(self.QTY-truck.available())
+                    pri = abs(self.QTY-truck.available(self.delivery_date, self.delivery_time))
                     self.upgrade_pq.heap_insert((pri, truck))
-                    
-                    if len(truck_list):
-                        for truck in truck_list:
-                            if truck.available():
-                                pri = abs(self.QTY-truck.available())
-                                self.upgrade_pq.heap_insert((pri, truck))
+        
+        # check for and add the remaining popped unbooked and available booked trucks that need to be added to the upgrade_pq queue of order/truck upgrade suggestions            
+        if len(truck_list):
+            for truck in truck_list:
+                if truck.available(self.delivery_date, self.delivery_time):
+                    pri = abs(self.QTY-truck.available(self.delivery_date, self.delivery_time))
+                    self.upgrade_pq.heap_insert((pri, truck))
         return self.upgrade_pq
             
     
