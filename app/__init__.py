@@ -34,7 +34,7 @@ with app.app_context():
             
         for nbrs in rows:
             print(nbrs[0], nbrs[1])
-            area = models.Area(nbrs[0], nbrs[1])
+            area = models.Area(nbrs[0].strip("\n"), nbrs[1].strip("\n"))
             db.session.add(area)
         print(len(rows))
         db.session.commit()
