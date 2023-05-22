@@ -810,6 +810,21 @@ def get_scheduled_order_details():
     
 # -- TRUCK END POINTS --
 
+@app.route('/api/v1/trucks/available', methods=['POST'])
+def unbooked_trucks():
+    booked_ids = set()
+    date = format_date(datetime(*[int(x) for x in request.get_json()['date'].split("-")]))
+    time = request.get_json()['time']
+    deliveries = db.session.query(Delivery)\
+        .join(DeliveryCompartment, DeliveryCompartment.delivery_id==Delivery.id)\
+        .filter((Delivery.date==date) & (Delivery.time==time)).all()
+    for delivery in deliveries:
+        booked_ids.add(delivery.truck_id)
+
+    # load unbooked trucks
+    av_trucks = db.session.query(Truck).filter(~(Truck.id.in_(tuple(booked_ids)))).all()
+    return av_trucks
+
 @app.route('/api/v1/trucks', methods=['GET', 'POST'])
 def trucks():
     if request.method == 'GET':

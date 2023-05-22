@@ -20,7 +20,7 @@
                         <td>{{delivery['available']}}</td>
                         <td>{{delivery['time']}}</td>
                         <td>
-                            <button type="button" class="btn btn-primary">Orders</button>
+                            <button type="button" class="btn btn-primary" disabled>Orders</button>
                         </td>
                     </tr>
                 </tbody>

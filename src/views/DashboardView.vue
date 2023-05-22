@@ -21,6 +21,26 @@
   let page = ref(1);
   let total = ref(0);
   let final_page = ref(1);
+  let trucks = ref([]);
+  let av_truck_date = ref(moment().format('DD/MM/YYYY'));
+  let av_truck_time = ref("Early");
+
+  $('body').on('click', '#av_trucks_update', function(){
+    fetch('/api/v1/trucks/available', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        'date': av_truck_date.value,
+        'time': av_truck_time.value
+      })
+    })
+    .then((response)=>response.json())
+    .then((result)=>{
+      if (result.status=='success') {
+        trucks.value = result.data
+      }
+    })
+  });
   
   onMounted(() => {
 
@@ -142,6 +162,26 @@
           data-target="#addtruckmodal">
           New Truck
         </button>
+
+        <div class="form-group">
+          <form action="" method="POST">
+            <label for="delivery_time"><strong>Available Trucks</strong></label>
+            <input :value="av_truck_date" type="date" name="" class="av_period" id="av_truck_date" :min="moment().format('DD/MM/YYYY')">
+            <select :value="av_truck_time" name="delivery_time" id="delivery_time" cols="30" rows="2" class="form-control av_period" maxlength="75" required>
+              <option value="Early" selected>Early</option>
+              <option value="Late">Late</option>
+            </select>
+            <button type="button" id="av_trucks_update" class="btn-success" style="margin:5px 30px;border-radius:5px;">Check</button>
+          </form>
+          <small>(view available trucks</small>
+          <small> by date)</small>
+        </div>
+        <div class="av_trucks">
+          <div v-for="truck in trucks">
+            ID:#{{ truck['id'] }}<br/>
+            Capacity : {{ truck['capacity'] }}
+          </div>
+        </div>
       </div>
 
       <div class="row">
@@ -229,9 +269,13 @@
     margin-bottom:30px;
   }
 
+  #av_truck_date {
+    width:120px;
+  }
+
   .dashboard-tables {
     /* margin-top:30px; */
-    margin-left:30px;
+    margin-left:180px;
     display:flex;
     flex-direction:column;
   }
@@ -245,7 +289,7 @@
   }
 
   .buttons {
-    position:sticky;
+    position:fixed;
     float:left;
     margin-right:20px;
     width:120px;
