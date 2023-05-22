@@ -820,7 +820,6 @@ def unbooked_trucks():
         date = format_date(datetime(int(year),int(month),int(day)))
         time = request.get_json()['time']
         deliveries = db.session.query(Delivery)\
-            .join(DeliveryCompartment, DeliveryCompartment.delivery_id==Delivery.id)\
             .filter((Delivery.date==date) & (Delivery.time==time)).all()
         for delivery in deliveries:
             booked_ids.add(delivery.truck_id)
