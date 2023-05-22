@@ -51,6 +51,7 @@
     .then((json_result) => {
       if (json_result.status=="success") {
         orders.value = json_result.data;
+        av_truck_date.value = moment().format('YYYY-MM-DD');
       }
     })
     .then(()=>{
@@ -167,7 +168,7 @@
           <br/>
           <form action="" method="POST">
             <label for="delivery_time"><small><strong>Available Trucks</strong></small></label>
-            <input v-model="av_truck_date" type="date" name="" class="av_period" id="av_truck_date" :min="moment().format('DD/MM/YYYY')">
+            <input v-model="av_truck_date" type="date" name="" class="av_period" id="av_truck_date" :min="moment().format('DD/MM/YYYY')" required>
             <select v-model="av_truck_time" name="delivery_time" id="delivery_time" cols="30" rows="2" class="form-control av_period" maxlength="75" required>
               <option value="Early" selected>Early</option>
               <option value="Late">Late</option>
@@ -180,7 +181,7 @@
           </form>
         </div>
         <br/>
-        <div class="text-white bg-dark text-center"><small><strong>Available Trucks</strong><br/>(by date)</small></div>
+        <div class="text-white bg-dark text-center"><small><strong>Available Trucks</strong><br/>(by date/time)</small></div>
         <div class="av_trucks table table striped border-dark bg-dark">
           <div style="padding-left:10px;" class="bg-light" v-for="truck in trucks">
             <small style="font-weight:500;">Truck ID:</small> {{ truck['id'] }}<br/>
@@ -272,7 +273,7 @@
 <style scoped>
 
   .av_trucks {
-    height: 100px;
+    max-height: 100px;
     overflow-y: auto;
   }
 
