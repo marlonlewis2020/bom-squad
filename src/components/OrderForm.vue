@@ -123,7 +123,7 @@
             method: 'GET',
             headers: {
                 // token: `bearer ${localStorage['token']}`
-        }
+          }
         })
         .then((result)=>{
             return result.json();
@@ -131,8 +131,6 @@
         .then((data) => {
             if (data.status == "success") {
                 customers.value = data.data;
-                
-                
             } else {
             console.log(data.message);
             }
@@ -146,8 +144,8 @@
     }>();
 
     function updateCustomer(event) {
-        var options = event.target;
-        var selected_index = options.selectedIndex - 1;
+        let options = event.target;
+        let selected_index = options.selectedIndex - 1;
         if (selected_index > -1) {
             cx.value = customers.value[selected_index];
             customer_id = cx.value['customer_id'];
@@ -176,9 +174,24 @@
                     console.log(data);
                     emit('close');
                     emit('refresh');
-                } else {
+                } else if(data.status == "unavailable") {
+                  console.log("There are no available trucks at this time to fulfill your order.");
+                  alert("There are no available trucks at this time to fulfill your order.");
+                  console.log(data);
+                  emit('close');
+                  emit('refresh');
+                } else if(data.status == "invalid") {
+                  console.log("Your order is invalid. Please try again.");
+                  alert("Your order is invalid. Please try again.");
+                  console.log(data);
+                  emit('close');
+                  emit('refresh');
+                }
+                else {
                     console.log(data);
                     emit('refresh');
+                    alert("There are no available trucks. Contact us by phone or email for further assistance or try another date.");
+                    emit('close');
                 }
             });
         } else {

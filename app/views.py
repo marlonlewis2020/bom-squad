@@ -333,6 +333,36 @@ def contacts(id):
 
 # -- ORDERS END POINTS -- 
 
+@app.route('/api/v1/deliveries', methods=['POST'])
+# @login_required
+def get_deilveries():
+    response = {
+        'status':'error'
+    }
+    date = request.get_json()['date']
+    try:
+        deliveries = db.session.query(Delivery)\
+            .join(Truck, Truck.id==Delivery.truck_id)\
+            .join(DeliveryCompartment, DeliveryCompartment.delivery_id==Delivery.id)\
+            .join(Order, Order.id==DeliveryCompartment.order_id)\
+            .add_column(Truck.license_plate)\
+            .filter(Delivery.date==date).all()
+        
+        response['status']='success'
+        response['data']=[]
+        for delivery in deliveries:
+            response['data'].append({
+                'id':delivery[0].id,
+                'license_plate':delivery[1],
+                'filled':delivery[0].filled,
+                'available':delivery[0].available,
+                'time':delivery[0].time,
+            })
+    except Exception as e:
+        print(e)
+        response['message']="Unable to retrieve delivery schedule at this time."
+    return make_response(response)
+
 @app.route('/api/v1/orders/<id>', methods=['GET', 'PUT'])
 # @login_required
 def order(id):
@@ -448,13 +478,15 @@ def orders():
             "data":[]
         }
         try:    
+            today_date = datetime.now()
             orders = db.session.query(Order, Customer, Address, User)\
                 .filter(
                     (Order.customer_id==User.id)\
                 & (User.id==Customer.id)\
                 & (Customer.address_id==Address.id)\
                 & (Order.status != "Cancelled")\
-                & (Order.status != "Deleted"))\
+                & (Order.status != "Deleted")
+                & (Order.delivery_date >= datetime(today_date.year, today_date.month, today_date.now().day) ))\
                 .order_by(desc(Order.id))\
                 .all()
             for o in orders:
@@ -741,7 +773,7 @@ def cancel_order(id):
     
 @app.route('/api/v1/orders/schedule', methods=['POST'])
 # @login_required
-def get_schedule():
+def get_scheduled_order_details():
     # start=<date:dateForma/t>&end=<date:dateFormat>
     date = request.form.get('date')
     time = request.form.get('time')
