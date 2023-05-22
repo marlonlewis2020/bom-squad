@@ -25,7 +25,7 @@
   let av_truck_date = ref(moment().format('DD/MM/YYYY'));
   let av_truck_time = ref("Early");
 
-  $('body').on('click', '#av_trucks_update', function(){
+  function available_trucks(){
     fetch('/api/v1/trucks/available', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -36,11 +36,11 @@
     })
     .then((response)=>response.json())
     .then((result)=>{
-      if (result.status=='success') {
+      if (result.status =='success') {
         trucks.value = result.data
       }
     })
-  });
+  };
   
   onMounted(() => {
 
@@ -164,22 +164,28 @@
         </button>
 
         <div class="form-group">
+          <br/>
           <form action="" method="POST">
-            <label for="delivery_time"><strong>Available Trucks</strong></label>
-            <input :value="av_truck_date" type="date" name="" class="av_period" id="av_truck_date" :min="moment().format('DD/MM/YYYY')">
-            <select :value="av_truck_time" name="delivery_time" id="delivery_time" cols="30" rows="2" class="form-control av_period" maxlength="75" required>
+            <label for="delivery_time"><small><strong>Available Trucks</strong></small></label>
+            <input v-model="av_truck_date" type="date" name="" class="av_period" id="av_truck_date" :min="moment().format('DD/MM/YYYY')">
+            <select v-model="av_truck_time" name="delivery_time" id="delivery_time" cols="30" rows="2" class="form-control av_period" maxlength="75" required>
               <option value="Early" selected>Early</option>
               <option value="Late">Late</option>
             </select>
-            <button type="button" id="av_trucks_update" class="btn-success" style="margin:5px 30px;border-radius:5px;">Check</button>
+            <button type="button" 
+              @click="available_trucks"
+              id="av_trucks_update" 
+              class="btn-success" 
+              style="margin:5px 30px;border-radius:5px;">Check</button>
           </form>
-          <small>(view available trucks</small>
-          <small> by date)</small>
         </div>
-        <div class="av_trucks">
-          <div v-for="truck in trucks">
-            ID:#{{ truck['id'] }}<br/>
-            Capacity : {{ truck['capacity'] }}
+        <br/>
+        <div class="text-white bg-dark text-center"><small><strong>Available Trucks</strong><br/>(by date)</small></div>
+        <div class="av_trucks table table striped border-dark bg-dark">
+          <div style="padding-left:10px;" class="bg-light" v-for="truck in trucks">
+            <small style="font-weight:500;">Truck ID:</small> {{ truck['id'] }}<br/>
+            <small style="font-weight:500;">Cap. (L):</small> {{ truck['capacity'] }}
+            <hr>
           </div>
         </div>
       </div>
@@ -264,6 +270,11 @@
 </template>
 
 <style scoped>
+
+  .av_trucks {
+    height: 100px;
+    overflow-y: auto;
+  }
 
   #schedule {
     margin-bottom:30px;
