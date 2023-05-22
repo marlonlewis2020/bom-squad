@@ -298,6 +298,7 @@
 
   .placeholder {
     margin-bottom:30px;
+    margin-left:180px;
   }
 
   .buttons {
