@@ -810,6 +810,39 @@ def get_scheduled_order_details():
     
 # -- TRUCK END POINTS --
 
+@app.route('/api/v1/trucks/available', methods=['POST'])
+def unbooked_trucks():
+    response = {'status':'error'}
+    booked_ids = set()
+    avs = []
+    year, month, day = request.get_json()['date'].split("-")
+    try:
+        date = format_date(datetime(int(year),int(month),int(day)))
+        time = request.get_json()['time']
+        deliveries = db.session.query(Delivery)\
+            .join(DeliveryCompartment, DeliveryCompartment.delivery_id==Delivery.id)\
+            .filter((Delivery.date==date) & (Delivery.time==time)).all()
+        for delivery in deliveries:
+            booked_ids.add(delivery.truck_id)
+
+        # load unbooked trucks
+        av_trucks = db.session.query(Truck).filter(~(Truck.id.in_(tuple(booked_ids)))).all()
+        for av in av_trucks:
+            avs.append({
+                'id':av.id,
+                'capacity':av.capacity,
+                'license_plate':av.license_plate,
+                'make':av.make,
+                'model':av.model,
+                'year':av.year
+            })
+        response['status'] = 'success'
+        response['data'] = avs
+    except Exception as e:
+        print(e)
+        response['message'] = 'Something went wrong while getting available trucks.'
+    return make_response(response)
+
 @app.route('/api/v1/trucks', methods=['GET', 'POST'])
 def trucks():
     if request.method == 'GET':

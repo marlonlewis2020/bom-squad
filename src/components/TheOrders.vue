@@ -103,9 +103,9 @@
         (event:'refresh'): void;
     }>();
 
-    onMounted(() => {
-      console.log(moment("Sat, 27 May 2023 00:00:00 GMT"));
-    });
+    // onMounted(() => {
+    //   console.log(moment("Sat, 27 May 2023 00:00:00 GMT"));
+    // });
 
     function back() {
         let prev = prop.page-1;
