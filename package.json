@@ -9,6 +9,8 @@
   "dependencies": {
     "@popperjs/core": "^2.11.7",
     "bootstrap-vue": "^2.23.1",
+    "moment": "^2.29.4",
+    "moment-timezone": "^0.5.43",
     "vue": "^3.2.47",
     "vue-router": "^4.1.6",
     "yarn": "^1.22.19"

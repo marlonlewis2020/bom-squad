@@ -2,7 +2,7 @@
     <div class="form">
         <div class="modal-content">
             <div class="modal-header">
-                <h5>Register</h5>
+                <h5>New Customer</h5>
                 <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close" @click="clear" >x</button>
             </div>
 
@@ -94,7 +94,7 @@
                         <div class="form-group">
                             <label for="password">Password</label>
                             <input id="password" name="password" type="password" class="form-control">
-                            <label for="confirm">Confirm</label>
+                            <!-- <label for="confirm">Confirm</label> -->
                             <!-- <input v-model="conf_pwd" id="confirm" name="confirm" type="password" class="form-control"> -->
                         </div>
                     </div>
@@ -115,8 +115,6 @@
 
         let form = new FormData($('form#register')[0])
         let url = "/api/v1/customers";
-        // let pwd = ref("");
-        // let conf_pwd = ref("");
 
         fetch(url, {
             method: 'POST',
@@ -129,11 +127,11 @@
         .then((data) => {
             if (data.status==="success") {
                 console.log('user registered');
-                window.location.assign('/login');
+                window.location.assign('/dashboard');
                 
             } else {
-                console.log('failed to register user');
-                alert("Login Failed! Try Again.")
+                console.log('Registration Failed! Contact System Administrator.');
+                alert("Registration Failed! Contact System Administrator.")
                 $('form#register').trigger('reset');
             }
         })
@@ -151,16 +149,16 @@
     }
 
     .btn-close {
-    border-width: 0;
-    border-color: rgb(182, 98, 98);
-    border-radius: 5px;
-    background-color: rgb(182, 98, 98);
-    color: rgb(64, 64, 64);
-    font-weight: 600;
-    font-family: monospace;
-    margin-top:2px;
-    margin-right:2px
-  }
+        border-width: 0;
+        border-color: rgb(182, 98, 98);
+        border-radius: 5px;
+        background-color: rgb(182, 98, 98);
+        color: rgb(64, 64, 64);
+        font-weight: 600;
+        font-family: monospace;
+        margin-top:2px;
+        margin-right:2px
+    }
 
     .btn {
         margin-top: 25px;

@@ -333,6 +333,36 @@ def contacts(id):
 
 # -- ORDERS END POINTS -- 
 
+@app.route('/api/v1/deliveries', methods=['POST'])
+# @login_required
+def get_deilveries():
+    response = {
+        'status':'error'
+    }
+    date = request.get_json()['date']
+    try:
+        deliveries = db.session.query(Delivery)\
+            .join(Truck, Truck.id==Delivery.truck_id)\
+            .join(DeliveryCompartment, DeliveryCompartment.delivery_id==Delivery.id)\
+            .join(Order, Order.id==DeliveryCompartment.order_id)\
+            .add_column(Truck.license_plate)\
+            .filter(Delivery.date==date).all()
+        
+        response['status']='success'
+        response['data']=[]
+        for delivery in deliveries:
+            response['data'].append({
+                'id':delivery[0].id,
+                'license_plate':delivery[1],
+                'filled':delivery[0].filled,
+                'available':delivery[0].available,
+                'time':delivery[0].time,
+            })
+    except Exception as e:
+        print(e)
+        response['message']="Unable to retrieve delivery schedule at this time."
+    return make_response(response)
+
 @app.route('/api/v1/orders/<id>', methods=['GET', 'PUT'])
 # @login_required
 def order(id):
@@ -448,13 +478,15 @@ def orders():
             "data":[]
         }
         try:    
+            today_date = datetime.now()
             orders = db.session.query(Order, Customer, Address, User)\
                 .filter(
                     (Order.customer_id==User.id)\
                 & (User.id==Customer.id)\
                 & (Customer.address_id==Address.id)\
                 & (Order.status != "Cancelled")\
-                & (Order.status != "Deleted"))\
+                & (Order.status != "Deleted")
+                & (Order.delivery_date >= datetime(today_date.year, today_date.month, today_date.now().day) ))\
                 .order_by(desc(Order.id))\
                 .all()
             for o in orders:
@@ -555,18 +587,20 @@ def orders():
             i_orders = total_order.keys()
             total_left = 0
             for gas in i_orders: # insert into priority queue
-                sub_order = total_order[gas]
-                if gas == preferred:
-                    prioritized_order.heap_insert((0, sub_order))
-                else:
-                    prioritized_order.heap_insert((1, sub_order))
+                sub_order = total_order.get(gas, None)
+                if sub_order:
+                    if gas == preferred:
+                        prioritized_order.heap_insert((0, sub_order))
+                    else:
+                        prioritized_order.heap_insert((1, sub_order))
                     
             while not prioritized_order.empty():
                 sub_order = prioritized_order.pop()
                 if sub_order.QTY > 0:
                     result = sub_order.fill_trucks()
                     total_left += result[0]
-                    balance[f"q_{sub_order.petrol}_order"]={
+                    priority_type = f"q_{sub_order.petrol}_order"
+                    balance[priority_type]={
                         "ordered":sub_order.O_QTY,
                         "filled":sub_order.O_QTY-result[0],
                     }
@@ -602,14 +636,17 @@ def orders():
                 response["message"] = "unable to fulfill order at this time. Please try a different date."
             else:
                 for gas in i_orders:
-                    fill_order = total_order[gas]
-                    if str(form.preferred.data).strip().casefold() == str(gas.split("_")[1]).casefold().strip():
-                        if not fill_order.upgrade_pq.empty():
-                            ug = fill_order.upgrade_pq.pop()
-                            lock_truck(order.id, ug, gas)
-                            balance[gas]["upgrades"]=[x.capacity for x in ug.available_compartments(fill_order.delivery_date, fill_order.delivery_time)]
-                        else:
-                            balance[gas]["upgrades"]=[]
+                    fill_order = total_order.get(gas, None)
+                    if fill_order:
+                        if str(form.preferred.data).strip().casefold() == str(gas.split("_")[1]).casefold().strip():
+                            if not fill_order.upgrade_pq.empty():
+                                ug = fill_order.upgrade_pq.pop()
+                                lock_truck(order.id, ug, gas)
+                                if balance.get(gas, None):
+                                    balance[gas]["upgrades"]=[x.capacity for x in ug.available_compartments(fill_order.delivery_date, fill_order.delivery_time)]
+                            else:
+                                if balance.get(gas, None):
+                                    balance[gas]["upgrades"]=[]
         except MySQLdb.OperationalError as ope:
             print(ope)
         
@@ -621,10 +658,7 @@ def orders():
             db.session.rollback()
             if added:
                 db.session.delete(order)
-            response = {
-                "status":"error"
-            }
-            response['message'] = "Unable to add order."
+            
             # if added:
                 # db.session.delete(order)
                 # db.session.commit()
@@ -739,7 +773,7 @@ def cancel_order(id):
     
 @app.route('/api/v1/orders/schedule', methods=['POST'])
 # @login_required
-def get_schedule():
+def get_scheduled_order_details():
     # start=<date:dateForma/t>&end=<date:dateFormat>
     date = request.form.get('date')
     time = request.form.get('time')

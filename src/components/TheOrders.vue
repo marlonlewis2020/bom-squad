@@ -5,44 +5,38 @@
             <thead>
                 <th>ID</th>
                 <th>Customer</th>
-                <!-- <th>Parish</th> -->
                 <th>Date</th>
                 <th>Time</th>
-                <!-- <th>Total</th> -->
-                <th>87</th>
-                <th>90</th>
-                <th>Diesel</th>
-                <th>ULSD</th>
+                <th>Total(L)</th>
                 <th>status</th>
-                <th>Actions</th>
+                <th style="width:85px;">Actions</th>
             </thead>
             <tbody>
-                <tr :id="order['orderID']" v-for="(order, index) in orders" 
-                    :order="order"
+                <tr v-for="(order, index) in orders" 
                     :key="index"> 
                     <td>{{ order['orderID'] }}</td>
                     <td>{{ order['customerName'] }}</td>
-                    <!-- <td>{{ order['parish'] }}</td> -->
-                    <td>{{ (order['deliveryDate']) }}</td>
+                    <td>{{ moment.parseZone(order['deliveryDate']+'+05:00').format('MMMM DD, YYYY') }}</td>
                     <td>{{ order['deliveryTime'] }}</td>
-                    <!-- <td>{{ order['orderQuantity'] }}</td> -->
-                    <td>{{ order['q_87'] }}</td>
-                    <td>{{ order['q_90'] }}</td>
-                    <td>{{ order['q_diesel'] }}</td>
-                    <td>{{ order['q_ulsd'] }}</td>
+                    <td>{{ order['orderQuantity'] }}</td>
                     <td><select name="status" id="status">
                         <option value="" disabled></option>
                         <option :value="order['status']" selected>{{ order['status'] }}</option>
                         <option value="pending" v-if="order['status']!=='Pending' && order['status']!=='Delivered'">Pending</option>
                         <option value="ready" v-if="order['status']!=='Ready' && order.status!=='Delivered'">Processing</option>
                         <option value="preparing" v-if="order['status']!=='Preparing' && order['status']!=='Delivered'">Preparing</option>
-                        <option value="delivering" v-if="order['status']!=='Pending' && order['status']!=='Delivering' && order['status']!=='Delivered'">Out for Delivery</option>
-                        <option value="delivered" v-if="order['status']!=='Pending' && order['status']!=='Processing' && order['status']!=='Delivered'">Delivered</option>
+                        <option value="delivering" v-if="order['status']!=='Delivered'">Out for Delivery</option>
+                        <option value="delivered" v-if="order['status']=='Delivering' && order['status']=='Delivered'">Delivered</option>
                     </select></td>
                     <td :id="order['orderID']+`_actions`">
-                        <div class="action_button btn btn-primary" @click="view(order['orderID'])"> View</div>
-                        <div class="action_button btn btn-primary" @click="update(order['orderID'])"> Update</div>
-                        <div class="action_button btn btn-dark" @click="cancel(order['orderID'])"> Cancel</div>
+                        <input type="button" 
+                        value="View" 
+                        class="action_button btn btn-primary" 
+                        @click="view(index)" 
+                        data-toggle="modal" 
+                        data-target="#viewordermodal"> 
+                        <input type="button" value="Update" class="action_button btn btn-primary" @click="update(order['orderID'])" disabled> 
+                        <input type="button" value="Cancel" class="action_button btn btn-dark" @click="cancel(order['orderID'])" disabled> 
                     </td> 
                 </tr>
             </tbody>
@@ -71,12 +65,33 @@
           </ul>
         </nav>
     </div>
+    
+    <div class="modal-forms">
+      <!-- Add Order Modal -->
+      <div id="viewordermodal" class="modal fade">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class='modal-header'>
+              <h5> View Order </h5>
+              <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close" @click="close" >x</button>
+            </div>
+            <div class=modal-body>
+              <SingleOrder :order="this_order" @close="close" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div> 
 
 </template>
 
 
 <script setup lang="ts">
-    // import { ref, onMounted } from 'vue'
+    import { ref, onMounted } from 'vue';
+    import moment from 'moment-timezone';
+    import SingleOrder from '../components/SingleOrder.vue';
+
+    let this_order = ref({});
 
     const prop = defineProps(['orders', 'page', 'perPage', 'final_page']);
     const emit = defineEmits<{
@@ -84,22 +99,22 @@
         (event:'update', id:number, status:string): void;
         (event:'cancel', id:number): void;
         (event:'updatePage', page:number): void;
+        (event:'close'): void;
+        (event:'refresh'): void;
     }>();
 
-    // onMounted(() => {
-        
-    // })
+    onMounted(() => {
+      console.log(moment("Sat, 27 May 2023 00:00:00 GMT"));
+    });
 
     function back() {
         let prev = prop.page-1;
         emit('updatePage', prev);
-        // location.reload();
     }
 
     function next() {
         let nex = prop.page+1;
         emit('updatePage', nex);
-        // location.reload();
     }
 
     function update(id:number, status:string){
@@ -110,13 +125,34 @@
         emit('cancel', id);
     }
 
-    function view(id:number){
-        emit('view', id);
+    function view(index:number){
+        this_order.value = prop.orders[index];
+    }
+
+    function close() {
+      $("[data-dismiss=modal]").trigger("click");
     }
 </script>
 
 
 <style scoped>
+
+  .modal-header {
+      background-color:rgb(89, 89, 152);
+      color:aliceblue;
+  }
+
+  .btn-close {
+      border-width: 0;
+      border-color: rgb(182, 98, 98);
+      border-radius: 5px;
+      background-color: rgb(182, 98, 98);
+      color: rgb(64, 64, 64);
+      font-weight: 600;
+      font-family: monospace;
+      margin-top:2px;
+      margin-right:2px
+  }
 
   input[type="file"] {
     width: 110px;
@@ -138,13 +174,14 @@
   }
 
   .table {
-    width:690px;
+    width:fit-content;
   }
 
   thead {
     background-color:rgb(89, 89, 152);
     color:aliceblue;
   }
+
   .btn-close {
     border-width: 0;
     border-color: rgb(182, 98, 98);
