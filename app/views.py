@@ -813,7 +813,9 @@ def get_scheduled_order_details():
 @app.route('/api/v1/trucks/available', methods=['POST'])
 def unbooked_trucks():
     booked_ids = set()
-    date = format_date(datetime(*[int(x) for x in request.get_json()['date'].split("-")]))
+    avs = []
+    year, month, day = request.get_json()['date'].split("-")
+    date = format_date(datetime(int(year),int(month),int(day)))
     time = request.get_json()['time']
     deliveries = db.session.query(Delivery)\
         .join(DeliveryCompartment, DeliveryCompartment.delivery_id==Delivery.id)\
@@ -823,7 +825,16 @@ def unbooked_trucks():
 
     # load unbooked trucks
     av_trucks = db.session.query(Truck).filter(~(Truck.id.in_(tuple(booked_ids)))).all()
-    return av_trucks
+    for av in av_trucks:
+        avs.append({
+            id:av.id,
+            'capacity':av.capacity,
+            'license_plate':av.license_plate,
+            'make':av.make,
+            'model':av.model,
+            'year':av.year
+        })
+    return make_response({'status':'success', 'data':avs})
 
 @app.route('/api/v1/trucks', methods=['GET', 'POST'])
 def trucks():
